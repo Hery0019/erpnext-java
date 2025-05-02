@@ -1,0 +1,24 @@
+<head>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<h1>Devis pour [[${nomFournisseur}]]</h1>
+<table class="liste-devis">
+    <thead>
+        <tr>
+            <th>Numéro</th>
+            <th>Date</th>
+            <th>Statut</th>
+            <th>Devise</th>
+            <th>Montant</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr th:each="devis : ${devis}">
+            <td th:text="${devis.numero}"></td>
+            <td th:text="${devis.date}"></td>
+            <td th:text="${devis.status}"></td>
+            <td th:text="${devis.currency}"></td>
+            <td th:text="${devis.montant != null ? devis.montant + ' MGA' : '-'}"></td>
+        </tr>
+    </tbody>
+</table>
