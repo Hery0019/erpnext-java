@@ -15,14 +15,16 @@
             <thead>
                 <tr>
                     <th>Nom</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
                 <tr th:each="fournisseur : ${fournisseurs}">
                     <td th:text="${fournisseur.name}">Nom</td>
                     <td>
-                        <a th:href="@{'/fournisseurs/' + ${fournisseur.name} + '/devis'}">regarder devis</a>
-                    </td>                    
+                        <a th:href="@{'/fournisseurs/' + ${fournisseur.name} + '/devis'}">voir devis</a> |
+                        <a th:href="@{'/fournisseur/commandes?nom=' + ${fournisseur.name}}">voir commandes</a>
+                    </td>
                 </tr>
             </tbody>
         </table>
