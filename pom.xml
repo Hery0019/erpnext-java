@@ -9,10 +9,10 @@
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>hery.itu</groupId>
-	<artifactId>newApp</artifactId>
+	<artifactId>Erp</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>newApp</name>
-	<description>NewApp</description>
+	<name>Erp</name>
+	<description>Erpnext Java by Hery</description>
 	<url/>
 	<licenses>
 		<license/>
