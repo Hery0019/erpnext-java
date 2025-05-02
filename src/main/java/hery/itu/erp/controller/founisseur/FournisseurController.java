@@ -16,6 +16,7 @@ import java.util.List;
 
 import org.springframework.ui.Model;
 import hery.itu.erp.model.Devis;
+import hery.itu.erp.model.ItemDevis;
 
 @Controller
 public class FournisseurController {
@@ -34,10 +35,47 @@ public class FournisseurController {
 
     @GetMapping("/fournisseurs/{nom}/devis")
     public String voirDevisParFournisseur(@PathVariable String nom, Model model) {
-        List<Devis> devis = fournisseurService.getDevisParFournisseur(nom); // implémente cette méthode
+        List<Devis> devis = fournisseurService.getDevisParFournisseur(nom);
         model.addAttribute("devis", devis);
         model.addAttribute("nomFournisseur", nom);
-        return "liste_devis"; // nom du fichier HTML à afficher
+
+        // Calculer les totaux par devise
+        java.util.Map<String, Double> totauxParDevise = new java.util.HashMap<>();
+        for (Devis d : devis) {
+            String currency = d.getCurrency();
+            if (currency == null) continue;
+            double montant = d.getMontant() != null ? d.getMontant() : 0.0;
+            totauxParDevise.put(currency, totauxParDevise.getOrDefault(currency, 0.0) + montant);
+        }
+        model.addAttribute("totauxParDevise", totauxParDevise);
+
+        // Préparer la map itemsParDevise
+        java.util.Map<String, java.util.List<ItemDevis>> itemsParDevise = new java.util.HashMap<>();
+        for (Devis d : devis) {
+            String currency = d.getCurrency();
+            java.util.List<ItemDevis> items = d.getItems();
+            if (currency == null || items == null) continue;
+            itemsParDevise.computeIfAbsent(currency, k -> new java.util.ArrayList<>()).addAll(items);
+        }
+        model.addAttribute("itemsParDevise", itemsParDevise);
+
+        return "liste_devis";
     }
 
+    @PostMapping("/modifier-prix")
+    public String modifierPrixUnitaire(
+            @RequestParam String itemCode,
+            @RequestParam String devisNumero,
+            @RequestParam double nouveauPrix,
+            @RequestParam(required = false) String nomFournisseur,
+            RedirectAttributes redirectAttributes) {
+        try {
+            fournisseurService.modifierPrixUnitaireItem(itemCode, nouveauPrix);
+            redirectAttributes.addFlashAttribute("message", "Prix modifié avec succès !");
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", "Erreur lors de la modification : " + e.getMessage());
+        }
+        // Redirige vers la liste des devis du fournisseur
+        return "redirect:/fournisseurs/" + (nomFournisseur != null ? nomFournisseur : "") + "/devis";
+    }
 }
