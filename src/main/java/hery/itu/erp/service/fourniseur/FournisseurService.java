@@ -62,7 +62,7 @@ public class FournisseurService {
         for (Map<String, Object> devisData : data) {
             String devisName = (String) devisData.get("name");
     
-            // Récupérer les détails du devis, incluant les items
+            // Appel pour obtenir les détails avec les items
             String detailsUrl = "http://erpnext.localhost:8001/api/resource/Supplier Quotation/" + devisName;
             ResponseEntity<Map> detailsResponse = restTemplate.exchange(detailsUrl, HttpMethod.GET, entity, Map.class);
             Map<String, Object> fullDevisData = (Map<String, Object>) detailsResponse.getBody().get("data");
@@ -73,32 +73,49 @@ public class FournisseurService {
             devis.setStatus((String) devisData.get("status"));
             devis.setCurrency((String) devisData.get("currency"));
     
-            // Extraire les items et leur prix
             List<Map<String, Object>> items = (List<Map<String, Object>>) fullDevisData.get("items");
             List<ItemDevis> itemList = new ArrayList<>();
             double total = 0.0;
     
             if (items != null) {
                 for (Map<String, Object> item : items) {
-                    String itemCode = (String) item.get("item_code");
-                    String description = (String) item.get("description");
-                    Double rate = item.get("rate") != null ? ((Number) item.get("rate")).doubleValue() : 0.0;
-    
                     ItemDevis itemDevis = new ItemDevis();
-                    itemDevis.setCode(itemCode);
-                    itemDevis.setDescription(description);
-                    itemDevis.setPrix(rate);
-                    itemList.add(itemDevis);
+                    itemDevis.setCode((String) item.get("item_code"));
+                    itemDevis.setDescription((String) item.get("description"));
+                    itemDevis.setQuantite(item.get("qty") != null ? ((Number) item.get("qty")).doubleValue() : 0.0);
+                    itemDevis.setUnite((String) item.get("uom"));
+                    itemDevis.setPrixUnitaire(item.get("rate") != null ? ((Number) item.get("rate")).doubleValue() : 0.0);
+                    itemDevis.setMontant(item.get("amount") != null ? ((Number) item.get("amount")).doubleValue() : 0.0);
+                    itemDevis.setEntrepot((String) item.get("warehouse"));
     
-                    total += rate;
+                    total += itemDevis.getMontant();
+                    itemList.add(itemDevis);
                 }
             }
     
-            devis.setMontant(total); // vous pouvez aussi définir .setItems(itemList)
+            devis.setMontant(total);
+            devis.setItems(itemList);
             devisList.add(devis);
         }
     
         return devisList;
     }
-    
+
+    public void modifierPrixUnitaireItem(String itemCode, double nouveauPrix) {
+        String url = "http://erpnext.localhost:8001/api/resource/Supplier Quotation Item/" + itemCode;
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Cookie", loginService.getSessionCookie());
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        java.util.Map<String, Object> body = new java.util.HashMap<>();
+        body.put("rate", nouveauPrix);
+
+        HttpEntity<java.util.Map<String, Object>> entity = new HttpEntity<>(body, headers);
+        ResponseEntity<String> response = restTemplate.exchange(
+            url, HttpMethod.PATCH, entity, String.class);
+
+        if (!response.getStatusCode().is2xxSuccessful()) {
+            throw new RuntimeException("Erreur lors de la modification du prix : " + response.getStatusCode());
+        }
+    }
 }
