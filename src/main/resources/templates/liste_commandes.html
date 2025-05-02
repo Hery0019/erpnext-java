@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Commandes du fournisseur</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+
+<h2>Commandes pour <span th:text="${nomFournisseur}"></span></h2>
+
+<form method="get" th:action="@{/fournisseur/commandes}">
+    <input type="hidden" name="nom" th:value="${nomFournisseur}" />
+    <label>Filtrer par statut :</label>
+<select name="statut">
+    <option value="recu" th:selected="${statutFiltre == 'recu'}">Reçu</option>
+    <option value="paye" th:selected="${statutFiltre == 'paye'}">Payé</option>
+</select>
+    <button type="submit">Filtrer</button>
+</form>
+
+<table border="1">
+    <thead>
+        <tr>
+            <th>Numéro</th>
+            <th>Titre</th>
+            <th>Statut</th>
+            <th>Devise</th>
+            <th>Montant</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr th:each="cmd : ${commandes}">
+            <td th:text="${cmd.numero}"></td>
+            <td th:text="${cmd.titre}"></td>
+            <td th:text="${cmd.status}"></td>
+            <td th:text="${cmd.currency}"></td>
+            <td th:text="${cmd.montant}"></td>
+        </tr>
+    </tbody>
+</table>
+
+</body>
+</html>
