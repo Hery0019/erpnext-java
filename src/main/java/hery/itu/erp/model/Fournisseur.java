@@ -1,7 +1,5 @@
 package hery.itu.erp.model;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
-@JsonIgnoreProperties(ignoreUnknown = true)
 public class Fournisseur {
 
     private String name;   // Code du fournisseur, ex: SUPP-00001
