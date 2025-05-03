@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Factures d'achat</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <h1>Factures pour [[${nomFournisseur}]]</h1>
+    <table>
+        <thead>
+            <tr>
+                <th>Numéro</th>
+                <th>Date</th>
+                <th>Statut</th>
+                <th>Montant</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="facture : ${factures}">
+                <td th:text="${facture.name}"></td>
+                <td th:text="${facture.postingDate}"></td>
+                <td th:text="${facture.status}"></td>
+                <td th:text="${#numbers.formatDecimal(facture.grandTotal, 1, 'COMMA', 2, 'POINT')}"></td>
+            </tr>
+        </tbody>
+    </table>
+</body>
+</html>
