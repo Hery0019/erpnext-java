@@ -5,163 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SLIDE LOGIN FORM</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: Arial, sans-serif;
-            background: url('https://source.unsplash.com/random/1920x1080') no-repeat center center fixed;
-            background-size: cover;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .login-container {
-            background: rgba(255, 255, 255, 0.9);
-            padding: 40px;
-            border-radius: 10px;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
-            width: 100%;
-            max-width: 400px;
-            text-align: center;
-        }
-
-        h1 {
-            color: #333;
-            margin-bottom: 30px;
-            font-size: 24px;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        input[type="text"],
-        input[type="password"] {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            margin-bottom: 15px;
-            box-sizing: border-box;
-            font-size: 16px;
-        }
-
-        .keep-logged {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 20px;
-        }
-
-        .keep-logged input {
-            margin-right: 10px;
-        }
-
-        button {
-            background-color: #0088cc;
-            color: white;
-            padding: 12px;
-            border: none;
-            border-radius: 5px;
-            width: 100%;
-            font-size: 16px;
-            cursor: pointer;
-            margin-bottom: 20px;
-        }
-
-        button:hover {
-            background-color: #006699;
-        }
-
-        .links {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 30px;
-            font-size: 14px;
-        }
-
-        .links a {
-            color: #666;
-            text-decoration: none;
-        }
-
-        .social-login {
-            text-align: center;
-        }
-
-        .social-login p {
-            color: #666;
-            margin-bottom: 15px;
-        }
-
-        .social-icons {
-            display: flex;
-            justify-content: center;
-            gap: 15px;
-        }
-
-        .social-icons a {
-            width: 35px;
-            height: 35px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            text-decoration: none;
-        }
-
-        .facebook { background-color: #3b5998; }
-        .twitter { background-color: #1da1f2; }
-        .google { background-color: #db4437; }
-
-        footer {
-            text-align: center;
-            color: #666;
-            font-size: 12px;
-            margin-top: 20px;
-        }
-    </style>
+    <link rel="stylesheet" th:href="@{/css/login.css}">
+        
 </head>
 <body>
     <div class="login-container">
-        <h1>SLIDE LOGIN FORM</h1>
+        <h1>ERPNEXT</h1>
         <form th:action="@{/login}" method="post">
             <div class="form-group">
-                <input type="text" name="username" placeholder="Email Address" required>
-                <input type="password" name="password" placeholder="Password" required>
-            </div>
-            
-            <div class="keep-logged">
-                <input type="checkbox" id="keep-logged">
-                <label for="keep-logged">Keep Me Logged In</label>
+                <input type="text" value="Administrator" name="username" placeholder="Email Address" required>
+                <input type="password" value="hery" name="password" placeholder="Password" required>
             </div>
 
-            <button type="submit">LOG IN</button>
-
-            <div class="links">
-                <a href="#">FORGOT PASSWORD?</a>
-                <a href="#">NEW USER? REGISTER</a>
-            </div>
-
-            <div class="social-login">
-                <p>Or Login Using :</p>
-                <div class="social-icons">
-                    <a href="#" class="facebook"><i class="fab fa-facebook-f"></i></a>
-                    <a href="#" class="twitter"><i class="fab fa-twitter"></i></a>
-                    <a href="#" class="google"><i class="fab fa-google"></i></a>
-                </div>
-            </div>
+            <button type="submit">Log In</button>
         </form>
         
-        <footer>
-            <p> 2025 Slide Login Form . All rights reserved | Design by W3layouts</p>
-        </footer>
     </div>
 </body>
 </html>

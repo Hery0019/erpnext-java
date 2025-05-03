@@ -1,0 +1,82 @@
+<!DOCTYPE html> 
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+
+    <h1>Devis pour [[${nomFournisseur}]]</h1>
+    
+    <div>
+        <h3>Totaux par devise :</h3>
+        <ul>
+            <li th:each="entry : ${totauxParDevise}">
+                <span th:text="${entry.key}"></span> :
+                <span th:text="${#numbers.formatDecimal(entry.value, 1, 'POINT', 2, 'COMMA')}"></span>
+            </li>
+        </ul>
+    </div>
+    
+    <div>
+        <h3>Items par devise :</h3>
+        <div th:each="entry : ${itemsParDevise}">
+            <h4 th:text="${entry.key}"></h4> <!-- Devise -->
+            <table class="table-items">
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Description</th>
+                        <th>Quantité</th>
+                        <th>UOM</th>
+                        <th>Prix unitaire</th>
+                        <th>Montant</th>
+                        <th>Entrepôt</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="item : ${entry.value}">
+                        <td th:text="${item.code}"></td>
+                        <td th:text="${item.description}"></td>
+                        <td th:text="${item.quantite}"></td>
+                        <td th:text="${item.unite}"></td>
+                        <td>
+                            <form th:action="@{/modifier-prix}" method="post" style="display:inline">
+                                <input type="hidden" name="itemCode" th:value="${item.code}" />
+                                <input type="hidden" name="devisNumero" th:value="${item.numeroDevis}" />
+                                <input type="hidden" name="nomFournisseur" th:value="${nomFournisseur}" />
+                                <input type="number" step="0.01" name="nouveauPrix" th:value="${item.prixUnitaire}" style="width:80px" />
+                                <button type="submit">Enregistrer</button>
+                            </form>
+                        </td>
+                        <td th:text="${item.montant}"></td>
+                        <td th:text="${item.entrepot}"></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <h3>Liste des Devis :</h3>
+    <table class="liste-devis">
+        <thead>
+            <tr>
+                <th>Numéro</th>
+                <th>Titre</th>
+                <th>Statut</th>
+                <th>Devise</th>
+                <th>Montant</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr th:each="devis : ${devis}">
+                <td th:text="${devis.numero}"></td>
+                <td th:text="${devis.date}"></td> <!-- anciennement "name" -->
+                <td th:text="${devis.status}"></td>
+                <td th:text="${devis.currency}"></td>
+                <td th:text="${devis.montant != null ? devis.montant + ' MGA' : '-'}"></td>
+            </tr>
+        </tbody>
+    </table>
+
+</body>
+</html>
