@@ -8,6 +8,7 @@ public class ItemDevis {
     private Double prixUnitaire;
     private Double montant;
     private String entrepot;
+    private String devisId;
 
     public ItemDevis() {}
 
@@ -31,4 +32,7 @@ public class ItemDevis {
 
     public String getEntrepot() { return entrepot; }
     public void setEntrepot(String entrepot) { this.entrepot = entrepot; }
+
+    public String getDevisId() { return devisId; }
+    public void setDevisId(String devisId) { this.devisId = devisId; }
 }
