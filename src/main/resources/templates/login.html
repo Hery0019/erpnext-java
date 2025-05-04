@@ -2,6 +2,10 @@
 <html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head>
     <meta charset="UTF-8">
+    <title>Connexion</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SLIDE LOGIN FORM</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
@@ -9,17 +13,26 @@
         
 </head>
 <body>
-    <div class="login-container">
-        <h1>ERPNEXT</h1>
-        <form th:action="@{/login}" method="post">
-            <div class="form-group">
-                <input type="text" value="Administrator" name="username" placeholder="Email Address" required>
-                <input type="password" value="hery" name="password" placeholder="Password" required>
-            </div>
 
-            <button type="submit">Log In</button>
+<div class="container d-flex align-items-center justify-content-center min-vh-100">
+    <div class="card shadow-sm p-4" style="min-width:350px;max-width:400px;width:100%;">
+        <div class="text-center mb-3">
+            <i class="fas fa-user-lock fa-3x text-primary mb-2"></i>
+            <h2 class="mb-2">Connexion</h2>
+            <p class="text-muted">Connectez-vous à votre compte ERPNext</p>
+        </div>
+        <form th:action="@{/login}" method="post">
+            <div class="mb-3">
+                <input type="text" class="form-control" value="Administrator" name="username" placeholder="Nom d'utilisateur" required autofocus>
+            </div>
+            <div class="mb-3">
+                <input type="password" class="form-control" value="hery" name="password" placeholder="Mot de passe" required>
+            </div>
+            <div class="d-grid">
+                <button type="submit" class="btn btn-primary">Se connecter</button>
+            </div>
         </form>
-        
     </div>
+</div>
 </body>
 </html>
