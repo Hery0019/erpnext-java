@@ -51,12 +51,12 @@ public class FournisseurService {
         String url = "http://erpnext.localhost:8001/api/resource/Supplier Quotation"
             + "?fields=[\"name\",\"title\",\"status\",\"currency\"]"
             + "&filters=[[\"supplier\",\"=\",\"" + fournisseurNom + "\"]]";
-        
+    
         HttpHeaders headers = new HttpHeaders();
         headers.set("Cookie", loginService.getSessionCookie());
         HttpEntity<String> entity = new HttpEntity<>(headers);
+    
         ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
-        
         List<Devis> devisList = new ArrayList<>();
         List<Map<String, Object>> data = (List<Map<String, Object>>) response.getBody().get("data");
     
@@ -89,6 +89,9 @@ public class FournisseurService {
                     itemDevis.setMontant(item.get("amount") != null ? ((Number) item.get("amount")).doubleValue() : 0.0);
                     itemDevis.setEntrepot((String) item.get("warehouse"));
     
+                    // ✅ Ajout du lien vers le devis
+                    itemDevis.setDevisId(devisName);
+    
                     total += itemDevis.getMontant();
                     itemList.add(itemDevis);
                 }
@@ -101,6 +104,7 @@ public class FournisseurService {
     
         return devisList;
     }
+    
 
     public void modifierPrixItem(String devisId, String itemCode, double newRate) {
         try {
@@ -115,76 +119,26 @@ public class FournisseurService {
             ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, getEntity, Map.class);
             
             if (response.getBody() != null && response.getBody().get("data") != null) {
-                Object dataObj = response.getBody().get("data");
-                if (dataObj instanceof Map) {
-                    Map<String, Object> data = (Map<String, Object>) dataObj;
-                    Object itemsObj = data.get("items");
-                    if (!(itemsObj instanceof List)) {
-                        throw new RuntimeException("'items' n'est pas une liste mais : " + (itemsObj == null ? "null" : itemsObj.getClass()));
+                Map<String, Object> data = (Map<String, Object>) response.getBody().get("data");
+                List<Map<String, Object>> items = (List<Map<String, Object>>) data.get("items");
+                
+                // Mettre à jour le prix de l'item spécifique
+                for (Map<String, Object> item : items) {
+                    if (item.get("item_code").equals(itemCode)) {
+                        item.put("rate", newRate);
+                        // Recalculer le montant
+                        double qty = ((Number) item.get("qty")).doubleValue();
+                        item.put("amount", qty * newRate);
+                        break;
                     }
-                    List<?> itemsRaw = (List<?>) itemsObj;
-                    List<Map<String, Object>> items = new java.util.ArrayList<>();
-                    for (Object itemObj : itemsRaw) {
-                        if (!(itemObj instanceof Map)) {
-                            throw new RuntimeException("Un item n'est pas un objet JSON mais : " + itemObj.getClass());
-                        }
-                        @SuppressWarnings("unchecked")
-                        Map<String, Object> item = (Map<String, Object>) itemObj;
-                        items.add(item);
-                    }
-                    for (Map<String, Object> item : items) {
-                        if (item.get("item_code").equals(itemCode)) {
-                            item.put("rate", newRate);
-                            double qty = ((Number) item.get("qty")).doubleValue();
-                            item.put("amount", qty * newRate);
-                            break;
-                        }
-                    }
-                    Map<String, Object> updateData = new HashMap<>();
-                    updateData.put("items", items);
-                    HttpEntity<Map<String, Object>> putEntity = new HttpEntity<>(updateData, headers);
-                    restTemplate.exchange(url, HttpMethod.PUT, putEntity, Map.class);
-                } else if (dataObj instanceof List) {
-                    // Si 'data' est une liste de devis (rare mais possible)
-                    List<?> dataList = (List<?>) dataObj;
-                    boolean updated = false;
-                    for (Object elem : dataList) {
-                        if (elem instanceof Map) {
-                            Map<String, Object> data = (Map<String, Object>) elem;
-                            Object itemsObj = data.get("items");
-                            if (!(itemsObj instanceof List)) continue;
-                            List<?> itemsRaw = (List<?>) itemsObj;
-                            List<Map<String, Object>> items = new java.util.ArrayList<>();
-                            for (Object itemObj : itemsRaw) {
-                                if (!(itemObj instanceof Map)) continue;
-                                @SuppressWarnings("unchecked")
-                                Map<String, Object> item = (Map<String, Object>) itemObj;
-                                items.add(item);
-                            }
-                            for (Map<String, Object> item : items) {
-                                if (item.get("item_code").equals(itemCode)) {
-                                    item.put("rate", newRate);
-                                    double qty = ((Number) item.get("qty")).doubleValue();
-                                    item.put("amount", qty * newRate);
-                                    updated = true;
-                                    break;
-                                }
-                            }
-                            if (updated) {
-                                Map<String, Object> updateData = new HashMap<>();
-                                updateData.put("items", items);
-                                HttpEntity<Map<String, Object>> putEntity = new HttpEntity<>(updateData, headers);
-                                restTemplate.exchange(url, HttpMethod.PUT, putEntity, Map.class);
-                                break;
-                            }
-                        }
-                    }
-                    if (!updated) {
-                        throw new RuntimeException("Aucun devis ou item correspondant trouvé dans la liste retournée par l'API.");
-                    }
-                } else {
-                    throw new RuntimeException("Format inattendu pour 'data': " + dataObj.getClass());
                 }
+                
+                // Préparer la requête PUT
+                Map<String, Object> updateData = new HashMap<>();
+                updateData.put("items", items);
+                
+                HttpEntity<Map<String, Object>> putEntity = new HttpEntity<>(updateData, headers);
+                restTemplate.exchange(url, HttpMethod.PUT, putEntity, Map.class);
             }
         } catch (Exception e) {
             System.err.println("Erreur lors de la modification du prix: " + e.getMessage());
