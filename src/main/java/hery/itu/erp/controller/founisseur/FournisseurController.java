@@ -1,14 +1,15 @@
 package hery.itu.erp.controller.founisseur;
 
 import org.springframework.http.*;
-import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import hery.itu.erp.service.fourniseur.FournisseurService;
 import hery.itu.erp.service.login.LoginService;
+
 import hery.itu.erp.model.Fournisseur;
 import hery.itu.erp.model.FournisseurResponse;
 import org.springframework.stereotype.Controller;   
@@ -62,20 +63,20 @@ public class FournisseurController {
         return "liste_devis";
     }
 
-    // @PostMapping("/modifier-prix")
-    // public String modifierPrixUnitaire(
-    //         @RequestParam String itemCode,
-    //         @RequestParam String devisNumero,
-    //         @RequestParam double nouveauPrix,
-    //         @RequestParam(required = false) String nomFournisseur,
-    //         RedirectAttributes redirectAttributes) {
-    //     try {
-    //         fournisseurService.modifierPrixUnitaireItem(itemCode, nouveauPrix);
-    //         redirectAttributes.addFlashAttribute("message", "Prix modifié avec succès !");
-    //     } catch (Exception e) {
-    //         redirectAttributes.addFlashAttribute("error", "Erreur lors de la modification : " + e.getMessage());
-    //     }
-    //     // Redirige vers la liste des devis du fournisseur
-    //     return "redirect:/fournisseurs/" + (nomFournisseur != null ? nomFournisseur : "") + "/devis";
-    // }
+
+    @PostMapping("/fournisseurs/devis/{devisId}/items/{itemCode}/updatePrice")
+    @ResponseBody
+    public ResponseEntity<String> updateItemPrice(
+            @PathVariable String devisId,
+            @PathVariable String itemCode,
+            @RequestParam Double newPrice) {
+        try {
+            fournisseurService.modifierPrixItem(devisId, itemCode, newPrice);
+            return ResponseEntity.ok("Prix mis à jour avec succès");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Erreur lors de la mise à jour du prix: " + e.getMessage());
+        }
+    }
+    
 }
