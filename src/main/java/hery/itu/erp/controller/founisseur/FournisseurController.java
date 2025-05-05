@@ -78,5 +78,6 @@ public class FournisseurController {
                     .body("Erreur lors de la mise à jour du prix: " + e.getMessage());
         }
     }
+
     
 }
