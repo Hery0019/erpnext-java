@@ -23,6 +23,9 @@
         <div class="card mb-4 shadow-sm">
             <div class="card-body">
                 <h5 class="card-title">Facture <span class="badge bg-primary" th:text="${detailsFactures.facture.name}"></span></h5>
+                <a class="btn btn-outline-danger btn-sm mb-2" th:href="@{'/factures/' + ${detailsFactures.facture.name} + '/pdf'}" target="_blank">
+                    <i class="bi bi-file-earmark-pdf"></i> Télécharger en PDF
+                </a>
                 <div class="row mb-2">
                     <div class="col-md-6"><strong>Fournisseur :</strong> <span th:text="${detailsFactures.facture.supplierName}"></span></div>
                     <div class="col-md-6"><strong>Date :</strong> <span th:text="${detailsFactures.facture.postingDate}"></span></div>
