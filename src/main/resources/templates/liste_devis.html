@@ -67,32 +67,36 @@
                         <td th:text="${item.entrepot}"></td>
                         <td>
                             <a href="#"
-                               class="btn-modifier-prix"
-                               th:data-itemcode="${item.code}"
-                               th:data-devisid="${item.devisId}"
-                               th:data-prixunitaire="${item.prixUnitaire}">
-                               Modifier prix
-                            </a>
+                                class="btn btn-warning btn-sm btn-modifier-prix"
+                                th:data-itemcode="${item.code}"
+                                th:data-devisid="${item.devisId}"
+                                th:data-prixunitaire="${item.prixUnitaire}">
+                                Modifier prix
+                            </a>    
                         </td>
-                        
                     </tr>
                 </tbody>
             </table>
         </div>
     </div>
 
-    <h3>Liste des Devis :</h3>
-    <table class="liste-devis">
-        <thead>
-            <tr>
-                <th>Numéro</th>
-                <th>Titre</th>
-                <th>Statut</th>
-                <th>Devise</th>
-                <th>Montant</th>
-            </tr>
-        </thead>
-        <tbody>
+    <div class="card shadow-sm mt-5">
+    <div class="card-header bg-primary text-white">
+        <h3 class="mb-0">Liste des Devis</h3>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover align-middle mb-0">
+                <thead class="table-primary">
+                    <tr>
+                        <th>Numéro</th>
+                        <th>Titre</th>
+                        <th>Statut</th>
+                        <th>Devise</th>
+                        <th>Montant</th>
+                    </tr>
+                </thead>
+                <tbody>
             <tr th:each="devis : ${devis}">
                 <td th:text="${devis.numero}"></td>
                 <td th:text="${devis.date}"></td> <!-- anciennement "name" -->
