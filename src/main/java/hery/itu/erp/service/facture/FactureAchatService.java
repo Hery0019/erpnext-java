@@ -178,55 +178,67 @@ public class FactureAchatService {
     }
 
 
-    public boolean payerFacture(String factureNom, Double amount) { 
+    public boolean payerFacture(String factureNom, Double amount) {
         try {
-            String url = "http://erpnext.localhost:8001/api/resource/Payment Entry";
-            
+            // D'abord, obtenons les détails de la facture pour avoir la société
+            String factureUrl = "http://erpnext.localhost:8001/api/resource/Purchase Invoice/" + factureNom;
             HttpHeaders headers = new HttpHeaders();
             headers.set("Cookie", loginService.getSessionCookie());
             headers.setContentType(MediaType.APPLICATION_JSON);
+            HttpEntity<String> factureEntity = new HttpEntity<>(headers);
             
-            // Récupération du fournisseur, de l'entreprise et des comptes associés
-            String supplier = getSupplierFromFacture(factureNom);
-            String company = getCompanyFromFacture(factureNom);
-            Map<String, String> comptes = (Map<String, String>) getComptesParEntreprise(company); // Cette méthode vous renvoie une map de comptes
-    
-            // Création de la structure de données pour le paiement
+            ResponseEntity<Map> factureResponse = restTemplate.exchange(factureUrl, HttpMethod.GET, factureEntity, Map.class);
+            Map<String, Object> factureData = (Map<String, Object>) factureResponse.getBody().get("data");
+            String company = (String) factureData.get("company");
+            
+            // Maintenant créons le Payment Entry
+            String url = "http://erpnext.localhost:8001/api/resource/Payment Entry";
+            
+            // Create payment entry data
             Map<String, Object> paymentData = new HashMap<>();
             paymentData.put("doctype", "Payment Entry");
+            paymentData.put("naming_series", "PE-.YYYY.-");
             paymentData.put("payment_type", "Pay");
             paymentData.put("party_type", "Supplier");
-            paymentData.put("party", supplier);
+            paymentData.put("party", getSupplierFromFacture(factureNom));
             paymentData.put("posting_date", new SimpleDateFormat("yyyy-MM-dd").format(new Date()));
+            paymentData.put("company", company);
             paymentData.put("paid_amount", amount);
-            paymentData.put("received_amount", amount); 
+            paymentData.put("received_amount", amount);
+            
+            // Champs obligatoires pour la validation
             paymentData.put("source_exchange_rate", 1.0);
-    
-            paymentData.put("reference_no", factureNom);
-            paymentData.put("reference_type", "Purchase Invoice");
-    
+            paymentData.put("target_exchange_rate", 1.0);
+            
+            // Définir directement le compte de paiement
+            paymentData.put("paid_from", "Capital Social - RS");
+            paymentData.put("paid_from_account_currency", "EUR");
+            
             List<Map<String, Object>> references = new ArrayList<>();
             Map<String, Object> reference = new HashMap<>();
             reference.put("reference_doctype", "Purchase Invoice");
             reference.put("reference_name", factureNom);
             reference.put("allocated_amount", amount);
             references.add(reference);
-    
+            
             paymentData.put("references", references);
-    
-            // ✅ Utilisation de l'entreprise récupérée et des comptes associés
-            paymentData.put("company", company);  // Le nom de l'entreprise
-            paymentData.put("mode_of_payment", "Cash");
-    
-            // Utilisation des comptes dynamiques (récupérés par `getComptesParEntreprise`)
-            paymentData.put("paid_from", "Capitaux Propres - RS");  // par exemple "Cash - SM"
-            paymentData.put("paid_from_account_currency", "EUR");
-            paymentData.put("paid_to", comptes.get("paid_to"));  // par exemple "Creditors - SM"
-    
+            
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(paymentData, headers);
             ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.POST, entity, Map.class);
             
-            return response.getStatusCode() == HttpStatus.OK;
+            if (response.getStatusCode() == HttpStatus.OK) {
+                Map<String, Object> responseData = (Map<String, Object>) response.getBody().get("data");
+                String paymentEntryName = (String) responseData.get("name");
+                String submitUrl = "http://erpnext.localhost:8001/api/resource/Payment Entry/" + paymentEntryName;
+                Map<String, Object> submitData = new HashMap<>();
+                submitData.put("docstatus", 1); // 1 pour soumis
+                HttpEntity<Map<String, Object>> submitEntity = new HttpEntity<>(submitData, headers);
+                ResponseEntity<Map> submitResponse = restTemplate.exchange(submitUrl, HttpMethod.PUT, submitEntity, Map.class);
+                
+                return submitResponse.getStatusCode() == HttpStatus.OK;
+            }
+            
+            return false;
         } catch (Exception e) {
             System.err.println("Erreur lors du paiement de la facture: " + e.getMessage());
             e.printStackTrace();
