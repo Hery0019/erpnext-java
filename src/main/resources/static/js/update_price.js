@@ -7,11 +7,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const itemCode = btn.getAttribute('data-itemcode');
             const devisId = btn.getAttribute('data-devisid');
             const prixUnitaire = btn.getAttribute('data-prixunitaire');
+            const entrepot = btn.getAttribute('data-entrepot');
 
             // Afficher un prompt pour le nouveau prix
             const newPrice = prompt('Entrer le nouveau prix pour l\'item ' + itemCode + ':', prixUnitaire);
             if(newPrice !== null && newPrice !== '' && !isNaN(newPrice)) {
-                fetch(`/fournisseurs/devis/${devisId}/items/${itemCode}/updatePrice?newPrice=${newPrice}`, {
+                fetch(`/fournisseurs/devis/${devisId}/items/${itemCode}/updatePrice?newPrice=${newPrice}&entrepot=${encodeURIComponent(entrepot)}`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded'

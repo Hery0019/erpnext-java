@@ -67,12 +67,13 @@
                         <td th:text="${item.entrepot}"></td>
                         <td>
                             <a href="#"
-                                class="btn btn-warning btn-sm btn-modifier-prix"
-                                th:data-itemcode="${item.code}"
-                                th:data-devisid="${item.devisId}"
-                                th:data-prixunitaire="${item.prixUnitaire}">
-                                Modifier prix
-                            </a>    
+    class="btn btn-warning btn-sm btn-modifier-prix"
+    th:data-itemcode="${item.code}"
+    th:data-devisid="${item.devisId}"
+    th:data-prixunitaire="${item.prixUnitaire}"
+    th:data-entrepot="${item.entrepot}">
+    Modifier prix
+</a>
                         </td>
                     </tr>
                 </tbody>

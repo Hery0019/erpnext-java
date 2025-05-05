@@ -69,9 +69,10 @@ public class FournisseurController {
     public ResponseEntity<String> updateItemPrice(
             @PathVariable String devisId,
             @PathVariable String itemCode,
-            @RequestParam Double newPrice) {
+            @RequestParam Double newPrice,
+            @RequestParam String entrepot) {
         try {
-            fournisseurService.modifierPrixItem(devisId, itemCode, newPrice);
+            fournisseurService.modifierPrixItem(devisId, itemCode, newPrice, entrepot);
             return ResponseEntity.ok("Prix mis à jour avec succès");
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)

@@ -106,7 +106,7 @@ public class FournisseurService {
     }
     
 
-    public void modifierPrixItem(String devisId, String itemCode, double newRate) {
+    public void modifierPrixItem(String devisId, String itemCode, double newRate, String entrepot) {
         try {
             String url = "http://erpnext.localhost:8001/api/resource/Supplier Quotation/" + devisId;
             
@@ -124,7 +124,7 @@ public class FournisseurService {
                 
                 // Mettre à jour le prix de l'item spécifique
                 for (Map<String, Object> item : items) {
-                    if (item.get("item_code").equals(itemCode)) {
+                    if (item.get("item_code").equals(itemCode) && (entrepot == null || entrepot.equals(item.get("warehouse")))) {
                         item.put("rate", newRate);
                         // Recalculer le montant
                         double qty = ((Number) item.get("qty")).doubleValue();
