@@ -12,7 +12,7 @@
         <div class="collapse navbar-collapse">
             <ul class="navbar-nav ms-auto">
                 <li class="nav-item"><a class="nav-link" th:href="@{'/factures'}">Factures</a></li>
-                <li class="nav-item"><a class="nav-link" th:href="@{'/'}">Accueil</a></li>
+                <li class="nav-item"><a class="nav-link" th:href="@{'/fournisseurs'}">Accueil</a></li>
             </ul>
         </div>
     </div>
@@ -73,7 +73,7 @@
                     <button type="submit" class="btn btn-success">Payer</button>
                 </div>
             </form>
-            <p class="text-muted mt-2">Montant restant : <span th:text="${detailsFactures.facture.outstandingAmount}"></span></p>
+            <p class="text-muted mt-2">Montant dû : <span th:text="${detailsFactures.facture.outstandingAmount}"></span></p>
         </div>
     </div>
     <div th:if="${detailsFactures == null}">
