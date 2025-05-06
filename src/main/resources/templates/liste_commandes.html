@@ -18,26 +18,14 @@
         </button>
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav ms-auto">
-                <li class="nav-item"><a class="nav-link" href="/">Accueil</a></li>
+                <li class="nav-item"><a class="nav-link" href="/fournisseurs">Fournisseur</a></li>
                 <li class="nav-item"><a class="nav-link" href="/factures">Factures</a></li>
-                <li class="nav-item"><a class="nav-link" href="/fournisseur/commandes?nom=[[${nomFournisseur}]]">Commandes</a></li>
-                <li class="nav-item"><a class="nav-link" href="/devis">Devis</a></li>
-                <li class="nav-item"><a class="nav-link" href="/logout">Déconnexion</a></li>
+                <li class="nav-item"><a class="nav-link" href="/">Déconnexion</a></li>
             </ul>
         </div>
     </div>
 </nav>
-<nav class="navbar navbar-expand-lg navbar-dark bg-primary sticky-top">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="/">ERPNext</a>
-        <div class="collapse navbar-collapse">
-            <ul class="navbar-nav ms-auto">
-                <li class="nav-item"><a class="nav-link" th:href="@{'/factures'}">Factures</a></li>
-                <li class="nav-item"><a class="nav-link" th:href="@{'/'}">Accueil</a></li>
-            </ul>
-        </div>
-    </div>
-</nav>
+
 <div class="container py-5">
 
 <h2>Commandes pour <span th:text="${nomFournisseur}"></span></h2>

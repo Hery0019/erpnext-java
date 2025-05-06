@@ -6,12 +6,22 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
 </head>
 <body>
-    <div class="container py-5">
-        <div class="text-center mb-4">
-            <h1 class="display-5">Bienvenue sur <span class="text-primary">ERPNext</span></h1>
-            <p class="lead">Vous êtes maintenant connecté à votre compte ERPNext.</p>
-            <a th:href="@{'/factures'}" class="btn btn-primary">Comptable</a>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary sticky-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">ERPNext</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link" href="/fournisseurs">Fournisseur</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/factures">Factures</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/">Déconnexion</a></li>
+                </ul>
+            </div>
         </div>
+    </nav>
+    <div classs="container py-5">
         <div class="card shadow-sm">
             <div class="card-header bg-primary text-white">
                 <h2 class="h5 mb-0">Liste des Fournisseurs</h2>
