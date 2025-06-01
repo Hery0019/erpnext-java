@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Liste des employés</title>
+    <meta charset="UTF-8">
+</head>
+<body>
+    <h1>Liste des employés</h1>
+
+    <form th:action="@{/employes/filtre}" method="get">
+        <label>Prénom (first_name):</label>
+        <input type="text" name="firstName" />
+
+        <label>Deuxième prénom (middle_name):</label>
+        <input type="text" name="middleName" />
+
+        <label>Genre:</label>
+        <select name="gender">
+            <option value="">-- Choisir --</option>
+            <option value="Male">Homme</option>
+            <option value="Female">Femme</option>
+        </select>
+
+        <label>Entreprise (company):</label>
+        <input type="text" name="company" />
+
+        <label>Statut:</label>
+        <select name="status">
+            <option value="">-- Choisir --</option>
+            <option value="Active">Actif</option>
+            <option value="Inactive">Inactif</option>
+            <option value="Left">Parti</option>
+            <option value="Suspended">Suspendu</option>
+        </select>
+
+        <br/><br/>
+
+        <label>Date d'embauche entre:</label>
+        <input type="date" name="dateStart" />
+        et
+        <input type="date" name="dateEnd" />
+
+        <br/><br/>
+        <button type="submit">Filtrer</button>
+    </form>
+
+    <br/>
+
+    <table border="1">
+        <thead>
+            <tr>
+                <th>Prénom</th>
+                <th>Deuxième prénom</th>
+                <th>Date de naissance</th>
+                <th>Date d'embauche</th>
+                <th>Statut</th>
+                <th>Genre</th>
+                <th>Company</th>
+            </tr>
+        </thead>
+        <tbody th:if="${employees != null}">
+            <tr th:each="emp : ${employees}">
+                <td th:text="${emp.first_name}">Prénom</td>
+                <td th:text="${emp.middle_name}">Deuxième prénom</td>
+                <td th:text="${emp.date_of_birth}">DOB</td>
+                <td th:text="${emp.date_of_joining}">DOJ</td>
+                <td th:text="${emp.status}">Statut</td>
+                <td th:text="${emp.gender}">Genre</td>
+                <td th:text="${emp.company}">Company</td>
+            </tr>
+        </tbody>
+        
+    </table>
+</body>
+</html>
