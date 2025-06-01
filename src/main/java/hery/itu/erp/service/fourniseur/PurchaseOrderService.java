@@ -20,7 +20,7 @@ public class PurchaseOrderService {
     private RestTemplate restTemplate =  new RestTemplate();;
 
     public List<PurchaseOrder> getCommandesParFournisseur(String fournisseurNom, String statut) {
-        String baseUrl = "http://erpnext.localhost:8001/api/resource/Purchase Order";
+        String baseUrl = "http://erpnext.localhost:8000/api/resource/Purchase Order";
         String fields = "[\"name\",\"title\",\"status\",\"currency\",\"grand_total\"]";
         String filters = "[[\"supplier\",\"=\",\"" + fournisseurNom + "\"]";
 

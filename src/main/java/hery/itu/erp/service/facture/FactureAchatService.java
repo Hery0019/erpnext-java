@@ -23,7 +23,7 @@ public class FactureAchatService {
     private LoginService loginService;
 
     public List<FactureAchat> getFacturesParFournisseur(String fournisseurNom) {
-        String url = "http://erpnext.localhost:8001/api/resource/Purchase Invoice"
+        String url = "http://erpnext.localhost:8000/api/resource/Purchase Invoice"
                 + "?fields=[\"name\",\"supplier\",\"posting_date\",\"status\",\"grand_total\"]"
                 + "&filters=[[\"supplier\",\"=\",\"" + fournisseurNom + "\"]]";
 
@@ -50,7 +50,7 @@ public class FactureAchatService {
     }
 
     public List<FactureAchat> getAllFactures() {
-        String url = "http://erpnext.localhost:8001/api/resource/Purchase Invoice"
+        String url = "http://erpnext.localhost:8000/api/resource/Purchase Invoice"
                 + "?fields=[\"name\",\"supplier\",\"posting_date\",\"status\",\"grand_total\"]";
 
         HttpHeaders headers = new HttpHeaders();
@@ -76,7 +76,7 @@ public class FactureAchatService {
     }
 
     public FactureAchat getFactureByName(String name) {
-        String url = "http://erpnext.localhost:8001/api/resource/Purchase Invoice/" + name + "?fields=[\"name\",\"supplier\",\"posting_date\",\"status\",\"grand_total\"]";
+        String url = "http://erpnext.localhost:8000/api/resource/Purchase Invoice/" + name + "?fields=[\"name\",\"supplier\",\"posting_date\",\"status\",\"grand_total\"]";
         HttpHeaders headers = new HttpHeaders();
         headers.set("Cookie", loginService.getSessionCookie());
         HttpEntity<String> entity = new HttpEntity<>(headers);
@@ -93,7 +93,7 @@ public class FactureAchatService {
 
     public DetailsFacture getDetailsFacture(String factureNom) {
         try {
-            String url = "http://erpnext.localhost:8001/api/resource/Purchase Invoice/" + factureNom;
+            String url = "http://erpnext.localhost:8000/api/resource/Purchase Invoice/" + factureNom;
             
             HttpHeaders headers = new HttpHeaders();
             headers.set("Cookie", loginService.getSessionCookie());
@@ -181,7 +181,7 @@ public class FactureAchatService {
     public boolean payerFacture(String factureNom, Double amount) {
         try {
             // D'abord, obtenons les détails de la facture pour avoir la société
-            String factureUrl = "http://erpnext.localhost:8001/api/resource/Purchase Invoice/" + factureNom;
+            String factureUrl = "http://erpnext.localhost:8000/api/resource/Purchase Invoice/" + factureNom;
             HttpHeaders headers = new HttpHeaders();
             headers.set("Cookie", loginService.getSessionCookie());
             headers.setContentType(MediaType.APPLICATION_JSON);
@@ -192,7 +192,7 @@ public class FactureAchatService {
             String company = (String) factureData.get("company");
             
             // Maintenant créons le Payment Entry
-            String url = "http://erpnext.localhost:8001/api/resource/Payment Entry";
+            String url = "http://erpnext.localhost:8000/api/resource/Payment Entry";
             
             // Create payment entry data
             Map<String, Object> paymentData = new HashMap<>();
@@ -229,7 +229,7 @@ public class FactureAchatService {
             if (response.getStatusCode() == HttpStatus.OK) {
                 Map<String, Object> responseData = (Map<String, Object>) response.getBody().get("data");
                 String paymentEntryName = (String) responseData.get("name");
-                String submitUrl = "http://erpnext.localhost:8001/api/resource/Payment Entry/" + paymentEntryName;
+                String submitUrl = "http://erpnext.localhost:8000/api/resource/Payment Entry/" + paymentEntryName;
                 Map<String, Object> submitData = new HashMap<>();
                 submitData.put("docstatus", 1); // 1 pour soumis
                 HttpEntity<Map<String, Object>> submitEntity = new HttpEntity<>(submitData, headers);
@@ -248,7 +248,7 @@ public class FactureAchatService {
     
     public Map<String, String> getComptesParEntreprise(String company) {
         try {
-            String url = "http://erpnext.localhost:8001/api/resource/Company/" + company;
+            String url = "http://erpnext.localhost:8000/api/resource/Company/" + company;
             HttpHeaders headers = new HttpHeaders();
             headers.set("Cookie", loginService.getSessionCookie());
             HttpEntity<String> entity = new HttpEntity<>(headers);
@@ -274,7 +274,7 @@ public class FactureAchatService {
     
     public String getCompanyFromFacture(String factureNom) {
         try {
-            String url = "http://erpnext.localhost:8001/api/resource/Purchase Invoice/" + factureNom;
+            String url = "http://erpnext.localhost:8000/api/resource/Purchase Invoice/" + factureNom;
             HttpHeaders headers = new HttpHeaders();
             headers.set("Cookie", loginService.getSessionCookie());
             HttpEntity<String> entity = new HttpEntity<>(headers);

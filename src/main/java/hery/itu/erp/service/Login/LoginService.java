@@ -19,7 +19,7 @@ public class LoginService {
     private String sessionCookie; // Stocke le cookie sid
 
     public boolean loginToErpNext(String username, String password) {
-        String url = "http://erpnext.localhost:8001/api/method/login";
+        String url = "http://erpnext.localhost:8000/api/method/login";
 
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("usr", username);

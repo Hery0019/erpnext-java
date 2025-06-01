@@ -27,11 +27,11 @@
     <h1>Devis pour [[${nomFournisseur}]]</h1>
     
     <div class="mb-4">
-        <h3 class="mb-3">Totaux par devise :</h3>
+        <h3 class="mb-3">Total :</h3>
         <ul class="list-group list-group-flush">
             <li class="list-group-item d-flex justify-content-between align-items-center" th:each="entry : ${totauxParDevise}">
                 <span th:text="${entry.key}"></span>
-                <span class="fw-bold" th:text="${#numbers.formatDecimal(entry.value, 1, 'POINT', 2, 'COMMA')}"></span>
+                <h2><span class="fw-bold" th:text="${#numbers.formatDecimal(entry.value, 1, 'POINT', 2, 'COMMA')}"></span></h2>
             </li>
         </ul>
     </div>
@@ -48,6 +48,7 @@
                             <thead class="table-primary">
                                 <tr>
                                     <th>Code</th>
+                                    <th>Numero Devis</th>
                                     <th>Description</th>
                                     <th>Quantité</th>
                                     <th>Unite</th>
@@ -60,6 +61,7 @@
                             <tbody>
                                 <tr th:each="item, iterStat : ${entry.value}">
                                     <td th:text="${item.code}"></td>
+                                    <td th:text="${item.devis.numero}"></td>
                                     <td th:text="${item.description}"></td>
                                     <td th:text="${item.quantite}"></td>
                                     <td th:text="${item.unite}"></td>

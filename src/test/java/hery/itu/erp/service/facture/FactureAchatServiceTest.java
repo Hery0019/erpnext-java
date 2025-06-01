@@ -63,7 +63,7 @@ public class FactureAchatServiceTest {
 
         ResponseEntity<Map> responseEntity = new ResponseEntity<>(responseBody, HttpStatus.OK);
 
-        String url = "http://erpnext.localhost:8001/api/resource/Purchase Invoice/" + factureNom;
+        String url = "http://erpnext.localhost:8000/api/resource/Purchase Invoice/" + factureNom;
         when(restTemplate.exchange(eq(url), eq(HttpMethod.GET), any(HttpEntity.class), eq(Map.class)))
                 .thenReturn(responseEntity);
 
