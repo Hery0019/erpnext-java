@@ -1,5 +1,7 @@
 package hery.itu.erp.model;
 
+import hery.itu.erp.model.Devis;
+
 public class ItemDevis {
     private String code;
     private String description;
@@ -8,6 +10,7 @@ public class ItemDevis {
     private Double prixUnitaire;
     private Double montant;
     private String entrepot;
+    private Devis devis;
     private String devisId;
 
     public ItemDevis() {}
@@ -35,4 +38,7 @@ public class ItemDevis {
 
     public String getDevisId() { return devisId; }
     public void setDevisId(String devisId) { this.devisId = devisId; }
+
+    public Devis getDevis() { return devis; }
+    public void setDevis(Devis devis) { this.devis = devis; }
 }
