@@ -57,6 +57,30 @@ public class EmployeeController {
         return "employes";
     }
 
+    @GetMapping("/employes/new")
+    public String showCreateForm(Model model) {
+        model.addAttribute("employee", new Employee());
+        return "employee-form";  // à créer
+    }
+
+    @PostMapping("/employes/create")
+    public String createEmployee(@ModelAttribute("employee") Employee employee, Model model) {
+        boolean success = employeeService.createEmployee(employee);
+
+        if (success) {
+            return "redirect:/employes";
+        } else {
+            model.addAttribute("error", "Failed to create employee");
+            return "employee-form";
+        }
+    }
+
+    @GetMapping("/employes/delete/{id}")
+    public String deleteEmploye(@PathVariable("id") String id) {
+        employeeService.deleteEmploye(id);
+        return "redirect:/employes";
+    }
+
     
 
 
