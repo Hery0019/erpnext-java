@@ -4,6 +4,7 @@ public class Employee {
     private String name;
     private String first_name;
     private String middle_name;
+    private String last_name;
     private String date_of_birth;
     private String date_of_joining;
     private String status;
@@ -27,6 +28,13 @@ public class Employee {
     }
     public void setMiddle_name(String middle_name) {
         this.middle_name = middle_name;
+    }
+
+    public String getLast_name() {
+        return last_name;
+    }
+    public void setLast_name(String last_name) {
+        this.last_name = last_name;
     }
     public String getDate_of_birth() {
         return date_of_birth;
