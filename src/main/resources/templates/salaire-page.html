@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Salary Slip</title>
+    <meta charset="UTF-8" />
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            background-color: #f4f7fa;
+            color: #333;
+        }
+
+        /* Barre de navigation */
+        nav {
+            background-color: #2c3e50;
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+        }
+
+        nav .logo {
+            font-size: 1.3em;
+            font-weight: bold;
+        }
+
+        nav a {
+            color: white;
+            text-decoration: none;
+            margin-left: 20px;
+            font-weight: 500;
+        }
+
+        nav a:hover {
+            text-decoration: underline;
+        }
+
+        main {
+            padding: 40px;
+        }
+
+        h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 12px 16px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #2980b9;
+            color: white;
+            font-weight: 600;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f9fbfd;
+        }
+
+        tr:hover {
+            background-color: #f1f9ff;
+        }
+
+        a.button {
+            display: inline-block;
+            padding: 8px 12px;
+            margin: 0;
+            background-color: #27ae60;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 0.9em;
+        }
+
+        a.button:hover {
+            background-color: #219150;
+        }
+
+        .back-link {
+            margin-top: 30px;
+            display: inline-block;
+            color: #2980b9;
+            text-decoration: none;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Barre de navigation -->
+    <nav>
+        <div class="logo">ERPNext</div>
+        <div>
+            <a href="/employes">Employee</a>
+            <a href="/salaries">Salary Register</a>
+            <a href="/">Logout</a>
+        </div>
+    </nav>
+
+    <main>
+        <h2>Salary Slip  for Employee <strong th:text="${employeeId}"></strong></h2>
+
+        <table th:if="${salaires != null}">
+            
+            <thead>
+                <tr>
+                    <th>Période</th>
+                    <th>Nom</th>
+                    <th>Brut</th>
+                    <th>Net</th>
+                    <th>Statut</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="salaire : ${salaires}">
+                    <td th:text="${salaire.start_date + ' au ' + salaire.end_date}"></td>
+                    <td th:text="${salaire.employee_name}"></td>
+                    <td th:text="${salaire.gross_pay + ' Ar'}"></td>
+                    <td th:text="${salaire.net_pay + ' Ar'}"></td>
+                    <td th:text="${salaire.status}"></td>
+                    <td>
+                        <a th:href="@{'/salaires/' + ${employeeId} + '/pdf'}"
+                            class="button"
+                            style="background-color:#27ae60; color:white; margin-bottom:15px; display:inline-block;">
+                            Download PDF
+                        </a>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </main>
+
+</body>
+</html>
