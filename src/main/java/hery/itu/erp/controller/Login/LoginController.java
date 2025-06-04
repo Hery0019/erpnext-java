@@ -19,7 +19,7 @@ public class LoginController {
     @PostMapping("/login")
     public String login(@RequestParam String username, @RequestParam String password) {
         if (loginService.loginToErpNext(username, password)==true) {
-            return "redirect:/fournisseurs";
+            return "redirect:/employes";
         }
         return "error"; // Redirige vers la page d'erreur
     }
