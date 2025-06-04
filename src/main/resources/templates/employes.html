@@ -157,6 +157,7 @@
     <nav>
         <div class="logo">ERPNext</div>
         <div>
+            <a href="/import">Import</a>
             <a href="/employes">Employee</a>
             <a href="/salaries">Salary Register</a>
             <a href="/">Logout</a>
@@ -247,8 +248,8 @@
                 <td>
                     <a th:href="@{/salaires/{employeeId}(employeeId=${emp.name})}" class="button">View Salaries</a>
                     <a th:href="@{/employes/delete/{id}(id=${emp.name})}" class="button" 
-                    style="background-color:#c0392b; margin-left: 5px;"
-                    onclick="return confirm('Are you sure you want to delete this employee?');">
+                        style="background-color:#c0392b; margin-left: 5px;"
+                        onclick="return confirm('Are you sure you want to delete this employee?');">
                         Delete
                     </a>
                 </td>
