@@ -150,30 +150,33 @@ public class EmployeeService {
     }
     
 
-    @PostMapping("/create-employee")
-    public ResponseEntity<String> createEmployeeInErp(@RequestBody Map<String, Object> employeeData) {
-        String url = "http://erpnext.localhost:8000/api/resource/Employee";
+    public boolean createEmployee(Employee employee) {
+        RestTemplate restTemplate = new RestTemplate();
 
+        String EMPLOYEE_API_URL = "http://erpnext.localhost:8000/api/resource/Employee";
 
-        // Préparer les headers
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("Cookie", loginService.getSessionCookie());
+        headers.add("Cookie", loginService.getSessionCookie());  // session auth
 
-        // Construire la requête
-        HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(employeeData, headers);
+        HttpEntity<Employee> request = new HttpEntity<>(employee, headers);
 
-        try {
-            ResponseEntity<String> response = restTemplate.exchange(
-                url,
-                HttpMethod.POST,
-                requestEntity,
-                String.class
-            );
-            return response;
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Erreur : " + e.getMessage());
-        }
+        ResponseEntity<String> response = restTemplate.postForEntity(EMPLOYEE_API_URL, request, String.class);
+
+        return response.getStatusCode() == HttpStatus.OK;
+    }
+
+    public void deleteEmploye(String employeeId) {
+        String sessionCookie = loginService.getSessionCookie();
+        String url = "http://erpnext.localhost:8000/api/resource/Employee/" + employeeId;
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Cookie", sessionCookie);
+
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+        RestTemplate restTemplate = new RestTemplate();
+        restTemplate.exchange(url, HttpMethod.DELETE, entity, String.class);
     }
 
 
