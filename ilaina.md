@@ -85,3 +85,69 @@ Exemple :
 | PINV-0002 | INFO-MG SARL          | 3 200 000 | Unpaid         |
 
 ---
+
+
+
+
+modifier les fonction suivante pour que getSalarySlipsByEmployee retourne un salarySlipName qu'on utilisera dans la fonction getSalarySlipDetail dans une nouvelle fonction 
+package hery.itu.erp.service.salary;
+
+import java.util.List;
+
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.http.*;
+
+import hery.itu.erp.model.salary.SalarySlip;
+import hery.itu.erp.model.salary.SalarySlipListResponse;
+import hery.itu.erp.service.login.LoginService;
+
+@Service
+public class SalarySlipService {
+
+    private final RestTemplate restTemplate;
+    private final LoginService loginService;
+
+    private final String BASE_URL = "http://erpnext.localhost:8000/api/resource";
+
+    public SalarySlipService(RestTemplate restTemplate, LoginService loginService) {
+        this.restTemplate = restTemplate;
+        this.loginService = loginService;
+    }
+
+    public List<SalarySlip> getSalarySlipsByEmployee(String employeeId) {
+        String url = BASE_URL + "/Salary Slip?filters=[[\"employee\",\"=\",\"" + employeeId + "\"]]&limit_page_length=100";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Cookie", loginService.getSessionCookie()); // Format: API_KEY:API_SECRET
+
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+        ResponseEntity<SalarySlipListResponse> response = restTemplate.exchange(
+            url,
+            HttpMethod.GET,
+            entity,
+            SalarySlipListResponse.class
+        );
+
+        return response.getBody().getData();
+    }
+
+    public SalarySlip getSalarySlipDetail(String salarySlipName) {
+        String url = BASE_URL + "/Salary Slip/" + salarySlipName;
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Cookie", loginService.getSessionCookie());
+
+        HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+        ResponseEntity<SalarySlip> response = restTemplate.exchange(
+            url,
+            HttpMethod.GET,
+            entity,
+            SalarySlip.class
+        );
+
+        return response.getBody();
+    }
+}
