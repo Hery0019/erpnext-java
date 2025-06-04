@@ -141,6 +141,15 @@
         a.button:hover {
             background-color: #219150;
         }
+        
+        .empty-message {
+            background-color: #fff3cd;
+            color: #856404;
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 20px;
+            border: 1px solid #ffeeba;
+        }
     </style>
 </head>
 <body>
@@ -213,7 +222,7 @@
             </div>
         </form>
 
-        <table th:if="${employees != null}">
+        <table th:if="${employees != null and !employees.isEmpty()}">
             <thead>
             <tr>
                 <th>First Name</th>
@@ -246,6 +255,10 @@
             </tr>
             </tbody>
         </table>
+         <!-- Message si aucune donnée -->
+        <div class="empty-message" th:if="${employees == null or employees.isEmpty()}">
+            <center><p><strong>Nothing to show</strong></p></center>
+        </div>
     </main>
 
 
