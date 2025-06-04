@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Salary Register</title>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            background-color: #f4f7fa;
+            color: #333;
+        }
+
+        nav {
+            background-color: #2c3e50;
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+        }
+
+        nav .logo {
+            font-size: 1.3em;
+            font-weight: bold;
+        }
+
+        nav a {
+            color: white;
+            text-decoration: none;
+            margin-left: 20px;
+            font-weight: 500;
+        }
+
+        nav a:hover {
+            text-decoration: underline;
+        }
+
+        main {
+            padding: 40px;
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+
+        form {
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+            margin-bottom: 30px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            min-width: 220px;
+            flex: 1;
+        }
+
+        form label {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        form input, form select {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 0.95em;
+        }
+
+        .form-actions {
+            margin-top: 20px;
+            width: 100%;
+        }
+
+        button {
+            background-color: #2980b9;
+            color: white;
+            padding: 10px 18px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        button:hover {
+            background-color: #216998;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 12px 16px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #2980b9;
+            color: white;
+            font-weight: 600;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f9fbfd;
+        }
+
+        tr:hover {
+            background-color: #f1f9ff;
+        }
+
+        .totals {
+            margin-top: 20px;
+            font-weight: bold;
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+
+        .empty-message {
+            background-color: #fff3cd;
+            color: #856404;
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 20px;
+            border: 1px solid #ffeeba;
+        }
+    </style>
+</head>
+<body>
+
+<nav>
+    <div class="logo">ERPNext</div>
+    <div>
+        <a href="/employes">Employee</a>
+        <a href="/salaries">Salary Register</a>
+        <a href="/">Logout</a>
+    </div>
+</nav>
+
+<main>
+    <h1>Salary Register</h1>
+
+    <!-- Formulaire de filtre -->
+    <form method="get" action="/salaries/report">
+        <div class="form-group">
+            <label for="from">From :</label>
+            <input type="date" id="from" name="from" th:value="${fromDate}" />
+        </div>
+        <div class="form-group">
+            <label for="to">To :</label>
+            <input type="date" id="to" name="to" th:value="${toDate}" />
+        </div>
+        <div class="form-group">
+            <label for="company">Company :</label>
+            <input type="text" id="company" name="company" th:value="${company}" />
+        </div>
+        <div class="form-actions">
+            <button type="submit">Filter</button>
+        </div>
+    </form>
+
+    <!-- Table des salaires dynamiques -->
+    <div th:if="${salaries != null and !salaries.isEmpty()}">
+        <table id="salary-table">
+            <thead>
+                <tr>
+                    <th>Nom</th>
+                    <th>Salaire brut</th>
+                    <th>Déductions</th>
+                    <th>Salaire net</th>
+                    <th th:each="componentName : ${componentsName}" th:text="${componentName}">Component</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="row, rowStat : ${salaries}">
+                    <td th:text="${row['employee_name']}"></td>
+                    <td class="gross" th:text="${row['gross_pay']} + ' ' + ${row['currency']}">0</td>
+                    <td class="deduction" th:text="${row['total_deduction']} + ' ' + ${row['currency']}">0</td>
+                    <td class="net" th:text="${row['net_pay']} + ' ' + ${row['currency']}">0</td>
+                    <th:block th:each="componentName, iterStat : ${componentsName}">
+                        <td th:text="${row['' + componentName + '']} + ' ' + ${row['currency']}" th:class="'component-' + ${iterStat.index}">0</td>
+                    </th:block>
+                </tr>
+            </tbody>
+            <tfoot>
+                <tr>
+                    <th>Total</th>
+                    <th id="total-gross">0</th>
+                    <th id="total-deduction">0</th>
+                    <th id="total-net">0</th>
+                    <th th:each="componentName, iterStat : ${componentsName}" th:id="'total-component-' + ${iterStat.index}">0</th>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
+    <!-- Message si aucune donnée -->
+    <div class="empty-message" th:if="${salaries == null or salaries.isEmpty()}">
+        <center><p><strong>Nothing to show</strong></p></center>
+    </div>
+</main>
+
+<script>
+    window.addEventListener('DOMContentLoaded', () => {
+        function sumColumn(className) {
+            const cells = document.querySelectorAll(`td.${className}`);
+            return Array.from(cells).reduce((sum, cell) => {
+                const val = parseFloat(cell.textContent.replace(/[^\d.-]/g, '')) || 0;
+                return sum + val;
+            }, 0);
+        }
+
+        document.getElementById('total-gross').textContent = sumColumn('gross');
+        document.getElementById('total-deduction').textContent = sumColumn('deduction');
+        document.getElementById('total-net').textContent = sumColumn('net');
+
+        // Pour les composants dynamiques
+        let i = 0;
+        while (true) {
+            const className = `component-${i}`;
+            const totalCell = document.getElementById(`total-component-${i}`);
+            if (!totalCell) break;
+            const total = sumColumn(className);
+            totalCell.textContent = total;
+            i++;
+        }
+    });
+</script>
+</body>
+</html>
