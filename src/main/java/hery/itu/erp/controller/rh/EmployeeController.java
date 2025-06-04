@@ -28,7 +28,7 @@ public class EmployeeController {
     @GetMapping("/employes/filtre")
     public String afficherEmployes(
             @RequestParam(required = false) String firstName,
-            @RequestParam(required = false) String middleName,
+            @RequestParam(required = false) String lastName,
             @RequestParam(required = false) String gender,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String dateStart,
@@ -37,7 +37,7 @@ public class EmployeeController {
             Model model
     ) {
         boolean noFilter = (firstName == null || firstName.isEmpty()) &&
-                        (middleName == null || middleName.isEmpty()) &&
+                        (lastName == null || lastName.isEmpty()) &&
                         (gender == null || gender.isEmpty()) &&
                         (status == null || status.isEmpty()) &&
                         (dateStart == null || dateStart.isEmpty()) &&
@@ -49,13 +49,15 @@ public class EmployeeController {
             employees = employeeService.getImportantEmployees();
         } else {
             employees = employeeService.filterEmployees(
-                firstName, middleName, gender, status, dateStart, dateEnd, company
+                firstName, lastName, gender, status, dateStart, dateEnd, company
             );
         }
 
         model.addAttribute("employees", employees);
         return "employes";
     }
+
+    
 
 
 }
