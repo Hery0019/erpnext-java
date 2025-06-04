@@ -4,6 +4,8 @@ import java.util.*;
 
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -46,12 +48,12 @@ public class EmployeeService {
         return response.getBody().getData();
     }
 
-    public List<Employee> filterEmployees(String firstName, String middleName, String gender, String status,
+    public List<Employee> filterEmployees(String firstName, String lastName, String gender, String status,
                                       String dateStart, String dateEnd, String company) {
 
         // URL avec les champs spécifiques en query string
         String url = "http://erpnext.localhost:8000/api/resource/Employee" +
-                "?fields=[\"first_name\",\"middle_name\",\"date_of_birth\",\"date_of_joining\"," +
+                "?fields=[\"first_name\",\"last_name\",\"date_of_birth\",\"date_of_joining\"," +
                 "\"status\",\"name\",\"gender\",\"company\"]" +
                 "&limit_page_length=1000";
 
@@ -60,8 +62,8 @@ public class EmployeeService {
         if (firstName != null && !firstName.isEmpty()) {
             filters.add(Arrays.asList("first_name", "like", "%" + firstName + "%"));
         }
-        if (middleName != null && !middleName.isEmpty()) {
-            filters.add(Arrays.asList("middle_name", "like", "%" + middleName + "%"));
+        if (lastName != null && !lastName.isEmpty()) {
+            filters.add(Arrays.asList("last_name", "like", "%" + lastName + "%"));
         }
         if (gender != null && !gender.isEmpty()) {
             filters.add(Arrays.asList("gender", "=", gender));
@@ -70,7 +72,7 @@ public class EmployeeService {
             filters.add(Arrays.asList("status", "=", status));
         }
         if (company != null && !company.isEmpty()) {
-            filters.add(Arrays.asList("company", "=", company));
+            filters.add(Arrays.asList("company", "like", "%" + company + "%"));
         }
 
         if (dateStart != null && !dateStart.isEmpty()) {
@@ -132,7 +134,7 @@ public class EmployeeService {
                 Employee emp = new Employee();
                 emp.setName(data.path("name").asText());
                 emp.setFirst_name(data.path("first_name").asText());
-                emp.setMiddle_name(data.path("middle_name").asText());
+                emp.setLast_name(data.path("last_name").asText());
                 emp.setDate_of_birth(data.path("date_of_birth").asText());
                 emp.setDate_of_joining(data.path("date_of_joining").asText());
                 emp.setGender(data.path("gender").asText());
@@ -148,7 +150,31 @@ public class EmployeeService {
     }
     
 
+    @PostMapping("/create-employee")
+    public ResponseEntity<String> createEmployeeInErp(@RequestBody Map<String, Object> employeeData) {
+        String url = "http://erpnext.localhost:8000/api/resource/Employee";
 
+
+        // Préparer les headers
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("Cookie", loginService.getSessionCookie());
+
+        // Construire la requête
+        HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(employeeData, headers);
+
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(
+                url,
+                HttpMethod.POST,
+                requestEntity,
+                String.class
+            );
+            return response;
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Erreur : " + e.getMessage());
+        }
+    }
 
 
 }
