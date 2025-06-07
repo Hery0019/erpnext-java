@@ -33,7 +33,7 @@ public class EmployeeService {
 
     public List<Employee> getImportantEmployees() {
         String url = baseUrl + "/api/resource/Employee?fields=[\"first_name\",\"middle_name\",\"date_of_birth\",\"date_of_joining\",\"status\",\"name\",\"gender\",\"company\"]";
-        
+
         HttpHeaders headers = new HttpHeaders();
         headers.set("Cookie", loginService.getSessionCookie()); 
         HttpEntity<String> entity = new HttpEntity<>(headers);
