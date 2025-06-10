@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <title th:text="'Détails des salaires - ' + ${month} + '/' + ${year}">Détails des salaires</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; background-color: #f4f7fa; color: #333; }
+        nav { background-color: #2c3e50; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; color: white; }
+        nav .logo { font-size: 1.3em; font-weight: bold; }
+        nav a { color: white; text-decoration: none; margin-left: 20px; font-weight: 500; }
+        nav a:hover { text-decoration: underline; }
+        main { padding: 40px; }
+        h1 { color: #2c3e50; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; background-color: #fff; border-radius: 8px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05); overflow: hidden; }
+        th, td { padding: 12px 16px; text-align: left; vertical-align: top; }
+        th { background-color: #2980b9; color: white; font-weight: 600; }
+        tr:nth-child(even) { background-color: #f9fbfd; }
+        tr:hover { background-color: #f1f9ff; }
+        ul { padding-left: 1rem; margin: 0; list-style-type: disc; }
+        a.back-link { display: inline-block; margin-top: 20px; padding: 8px 14px; background-color: #2980b9; color: white; border-radius: 5px; text-decoration: none; font-weight: 600; }
+        a.back-link:hover { background-color: #216998; }
+    </style>
+</head>
+<body>
+
+<nav>
+    <div class="logo">ERPNext</div>
+    <div>
+        <a href="/import">Import</a>
+        <a href="/employes">Employee</a>
+        <a href="/salaries">Salary Register</a>
+        <a href="/salary-total/show">Salary Total</a>
+        <a href="/">Logout</a>
+    </div>
+</nav>
+
+<main>
+    <h1 th:text="'Détails des salaires pour ' + ${month} + '/' + ${year}">Détails des salaires</h1>
+
+    <div th:if="${salaries != null and !salaries.isEmpty()}">
+        <table>
+            <thead>
+                <tr>
+                    <th>Nom</th>
+                    <th>Employé</th>
+                    <th>Brut</th>
+                    <th>Gains</th>
+                    <th>Déductions</th>
+                    <th>Net</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="salary : ${salaries}">
+                    <td th:text="${salary.slipName}">Slip Name</td>
+                    <td th:text="${salary.employeeName}">Employee</td>
+                    <td th:text="${#numbers.formatDecimal(salary.grossPay, 1, 'POINT', 2, 'NONE')}">Gross</td>
+
+                    <td>
+                        <ul>
+                            <li th:each="earning : ${salary.earnings}">
+                                <span th:text="${earning.salaryComponent} + ' : '"></span>
+                                <strong th:text="${#numbers.formatDecimal(earning.amount, 1, 'POINT', 2, 'NONE')}"></strong>
+                            </li>
+                        </ul>
+                    </td>
+
+                    <td>
+                        <ul>
+                            <li th:each="deduction : ${salary.deductions}">
+                                <span th:text="${deduction.salaryComponent} + ' : '"></span>
+                                <strong th:text="${#numbers.formatDecimal(deduction.amount, 1, 'POINT', 2, 'NONE')}"></strong>
+                            </li>
+                        </ul>
+                    </td>
+
+                    <td th:text="${#numbers.formatDecimal(salary.netPay, 1, 'POINT', 2, 'NONE')}">Net</td>
+                    <td th:text="${salary.status}">Status</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div th:if="${salaries == null or salaries.isEmpty()}">
+        <p style="background-color:#fff3cd; padding:12px; border-radius:6px; color:#856404; border:1px solid #ffeeba;">
+            Aucun détail de salaire trouvé pour ce mois.
+        </p>
+    </div>
+
+    <a th:href="@{/salary-total/show(year=${year})}" class="back-link">← Retour</a>
+</main>
+
+</body>
+</html>
