@@ -1,25 +1,17 @@
 package hery.itu.erp.service.salary;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import hery.itu.erp.model.salary.SalaryReport;
 import hery.itu.erp.service.login.LoginService;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.time.Month;
+import java.time.format.DateTimeFormatter;
+import java.time.format.TextStyle;
+import java.util.*;
 
 @Service
 public class SalaryReportService {
@@ -28,11 +20,9 @@ public class SalaryReportService {
     private RestTemplate restTemplate;
 
     @Autowired
-    private LoginService loginService; // pour le cookie de session ERPNext
+    private LoginService loginService;
 
-    
-
-    // Tu laisses cette méthode telle quelle (c’est ton appel HTTP)
+    // Appel brut du rapport depuis ERPNext
     public Map<String, Object> getSalaryReport(LocalDate fromDate, LocalDate toDate, String company) {
         String url = "http://erpnext.localhost:8000/api/method/frappe.desk.query_report.run";
 
@@ -56,11 +46,12 @@ public class SalaryReportService {
         return response.getBody();
     }
 
+    // Récupère les noms formatés (snake_case) des Salary Components
     public List<String> getFormattedSalaryComponentNames() {
         String url = "http://erpnext.localhost:8000/api/resource/Salary Component?fields=[\"name\"]";
 
         HttpHeaders headers = new HttpHeaders();
-        headers.set("Cookie", loginService.getSessionCookie()); 
+        headers.set("Cookie", loginService.getSessionCookie());
 
         HttpEntity<Void> entity = new HttpEntity<>(headers);
 
@@ -86,5 +77,47 @@ public class SalaryReportService {
         return formattedNames;
     }
 
+    public List<Map<String, Object>> getMonthlySalarySummaryByYear(int year, String company) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        List<String> componentNames = getFormattedSalaryComponentNames();
 
+        for (int month = 1; month <= 12; month++) {
+            LocalDate fromDate = LocalDate.of(year, month, 1);
+            LocalDate toDate = fromDate.withDayOfMonth(fromDate.lengthOfMonth());
+
+            Map<String, Object> reportData = getSalaryReport(fromDate, toDate, company);
+
+            Object messageObj = reportData.get("message");
+            if (!(messageObj instanceof Map<?, ?> message)) continue;
+
+            Object resultObj = message.get("result");
+            if (!(resultObj instanceof List<?> resultList)) continue;
+
+            // Initialiser les totaux à 0 pour chaque composant
+            Map<String, Object> monthlySummary = new LinkedHashMap<>();
+            monthlySummary.put("mois", Month.of(month).getDisplayName(TextStyle.FULL, Locale.FRENCH));
+
+            for (String comp : componentNames) {
+                monthlySummary.put(comp, 0.0);
+            }
+
+            for (Object rowObj : resultList) {
+                if (!(rowObj instanceof Map<?, ?> row)) continue;
+
+                for (String comp : componentNames) {
+                    Object valObj = row.get(comp);
+                    if (valObj instanceof Number val) {
+                        Double current = (Double) monthlySummary.get(comp);
+                        monthlySummary.put(comp, current + val.doubleValue());
+                    }
+                }
+            }
+
+            result.add(monthlySummary);
+        }
+
+        return result;
+    }
+
+    
 }
