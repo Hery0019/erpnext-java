@@ -27,7 +27,7 @@ public class SalaryReportController {
     public String showSalaryReport(
             @RequestParam("from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
             @RequestParam("to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
-            @RequestParam(defaultValue = "My Company") String company,
+            @RequestParam(defaultValue = "Orinasa SA") String company,
             Model model
     ) {
         // Récupération des données du service
