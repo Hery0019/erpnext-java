@@ -28,7 +28,7 @@ public class ImportService {
 
 
     public Map importCsvFiles(byte[] file1Bytes, byte[] file2Bytes, byte[] file3Bytes)throws Exception {
-        String url = "http://erpnext.localhost:8000/api/method/erpnext.api.salaireImport.import_csv_files";
+        String url = "http://erpnext.localhost:8000/api/method/erpnext.api.importSeparer.import_csv_files";
     
         String content1 = Base64.getEncoder().encodeToString(file1Bytes);
         String content2 = Base64.getEncoder().encodeToString(file2Bytes);
