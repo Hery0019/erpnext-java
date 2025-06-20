@@ -20,6 +20,7 @@ import hery.itu.erp.service.util.StringConvertService;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Map;
 import java.util.List;
@@ -54,8 +55,9 @@ public class SalaryStructAssController {
         @RequestParam String from_date,
         @RequestParam(required = false) String to_date,
         @RequestParam String posting_date,
-        @RequestParam(required = false) String base,
-        @RequestParam String currency
+        @RequestParam String base,
+        @RequestParam String currency,
+        Model model
     ) throws Exception {
         // Appel service
         SalaryStructAss salaryStructAss = new SalaryStructAss();
@@ -65,10 +67,59 @@ public class SalaryStructAssController {
         salaryStructAss.setFrom_date(from_date);
         salaryStructAss.setTo_date(to_date);
         salaryStructAss.setPosting_date(posting_date);
+        salaryStructAss.setBase(new BigDecimal(base));
+        salaryStructAss.setCurrency(currency);
 
         salaryStructAssService.createAssignmentAndSlip(salaryStructAss);
 
+        model.addAttribute("success", "Salary Struct Ass created successfully");
+
         return "redirect:/salary-struct-ass";
+    }
+
+    @GetMapping("/salary-struct-ass/generate-form")
+    public String generateSalaryStructAssForm(Model model) {
+        List<Employee> employees = employeeService.getImportantEmployees();
+        model.addAttribute("employees", employees);
+        return "salary-struct-ass-generate-form";
+    }
+
+    @PostMapping("/salary-struct-ass/generate")
+    public String generateSalaryStructAss(
+        @RequestParam String employee,
+        @RequestParam String salary_structure,
+        @RequestParam String company,
+        @RequestParam String from_date,  // date début
+        @RequestParam String to_date,    // date fin
+        @RequestParam String posting_date,
+        @RequestParam(required = false) String base,  // peut être null
+        @RequestParam String currency,
+        Model model
+    ) throws Exception {
+    
+        // 🔑 Construire SalaryStructAss de base
+        SalaryStructAss salaryStructAss = new SalaryStructAss();
+        salaryStructAss.setEmployee(employee);
+        salaryStructAss.setSalary_structure(salary_structure);
+        salaryStructAss.setCompany(company);
+        salaryStructAss.setCurrency(currency);
+        if (base != null && !base.isEmpty()) {
+            salaryStructAss.setBase(new BigDecimal(base));
+        }
+        // from_date & to_date pour la boucle, posting_date est utilisé pour chaque slip
+        salaryStructAss.setPosting_date(posting_date);
+    
+        // ✅ Appeler la nouvelle méthode generateSalary avec LocalDate
+        LocalDate start = LocalDate.parse(from_date);
+        LocalDate end = LocalDate.parse(to_date);
+    
+        var slips = salaryStructAssService.generateSalary(salaryStructAss, start, end);
+    
+        model.addAttribute("success",
+            "Salary Slips générés : " + slips.size() + " slips créés de " + from_date + " à " + to_date
+        );
+    
+        return "redirect:/salary-struct-ass/generate-form";
     }
 
     

@@ -129,6 +129,39 @@
             margin-top: 20px;
             border: 1px solid #ffeeba;
         }
+
+        /* Style général pour tous les boutons de type lien */
+        a.button {
+            display: inline-block;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        /* Style spécifique pour "+ New Salary Struct Ass" */
+        a[href="/salary-struct-ass"] {
+            background-color: #2980b9; /* Bleu ERPNext */
+            color: white;
+            border: 1px solid #1a6aa1;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Effet au survol */
+        a[href="/salary-struct-ass"]:hover {
+            background-color: #1a6aa1; /* Bleu plus foncé */
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Style pour le texte (amélioration de la lisibilité) */
+        a[href="/salary-struct-ass"] {
+            font-size: 14px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase; /* Optionnel : "NEW SALARY STRUCT ASS" en majuscules */
+        }
     </style>
 </head>
 <body>

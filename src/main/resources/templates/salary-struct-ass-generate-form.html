@@ -113,39 +113,6 @@
             margin-top: 15px;
             border: 1px solid #bce8f1;
         }
-
-        /* Style général pour tous les boutons de type lien */
-        a.button {
-            display: inline-block;
-            padding: 10px 20px;
-            border-radius: 5px;
-            font-weight: 600;
-            text-decoration: none;
-            transition: all 0.3s ease;
-            text-align: center;
-        }
-
-        /* Style spécifique pour "+ New Salary Struct Ass" */
-        a[href="/salary-struct-ass/generate-form"] {
-            background-color: #2980b9; /* Bleu ERPNext */
-            color: white;
-            border: 1px solid #1a6aa1;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        }
-
-        /* Effet au survol */
-        a[href="/salary-struct-ass/generate-form"]:hover {
-            background-color: #1a6aa1; /* Bleu plus foncé */
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-        }
-
-        /* Style pour le texte (amélioration de la lisibilité) */
-        a[href="/salary-struct-ass/generate-form"] {
-            font-size: 14px;
-            letter-spacing: 0.5px;
-            text-transform: uppercase; /* Optionnel : "NEW SALARY STRUCT ASS" en majuscules */
-        }
     </style>
 </head>
 <body>
@@ -165,11 +132,10 @@
     <div class="form-container">
         
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <h1>Créer un Salary Struct Ass</h1>
-            <a href="/salary-struct-ass/generate-form" class="button" style="background-color:#2980b9;">+ Generer Salary Struct Ass</a>
+            <h1>Generer un Salary </h1>
         </div>
 
-        <form th:action="@{/salary-struct-ass/create}" th:object="${salaryStructAss}" method="post">
+        <form th:action="@{/salary-struct-ass/generate}" th:object="${salaryStructAss}" method="post">
             <select name="employee" id="">
                 <option value="">-- Choose --</option>
                 <option th:each="employee : ${employees}" th:value="${employee.name}" th:text="${employee.first_name}"></option>
@@ -184,7 +150,7 @@
                 <input type="date" name="from_date" required />
             </label>
             <label>To Date:
-                <input type="hidden" name="to_date"/>
+                <input type="date" name="to_date" required />
             </label>
             <label>Posting Date:
                 <input type="date" name="posting_date" required />
