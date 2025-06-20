@@ -151,3 +151,6 @@ public class SalarySlipService {
         return response.getBody();
     }
 }
+
+bench --site erpnext.localhost set-config developer_mode 1
+bench --site erpnext.localhost clear-cache

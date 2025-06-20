@@ -140,11 +140,17 @@
             <label>From Date:
                 <input type="date" name="from_date" required />
             </label>
+            <label>To Date:
+                <input type="date" name="to_date"/>
+            </label>
+            <label>Posting Date:
+                <input type="date" name="posting_date" required />
+            </label>
             <label>Base:
                 <input type="text" name="base"/>
             </label>
             <label>Salary Currency:
-                <input type="text" name="currency" required />
+                <input type="hidden" value="USD" name="currency" />
             </label>
 
             <button type="submit">Créer</button>

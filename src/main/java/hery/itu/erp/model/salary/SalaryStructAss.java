@@ -8,16 +8,20 @@ public class SalaryStructAss {
     private String employee;
     private String salary_structure;
     private String company;
-    private LocalDate from_date;
+    private String from_date;
+    private String to_date;
+    private String posting_date;
     private String currency;
     private BigDecimal base;
     
-    public SalaryStructAss(String employee, String salary_structure, String company, LocalDate from_date,
-            String currency, BigDecimal base) {
+    public SalaryStructAss(String employee, String salary_structure, String company, String from_date,
+            String to_date, String posting_date, String currency, BigDecimal base) {
         this.employee = employee;
         this.salary_structure = salary_structure;
         this.company = company;
         this.from_date = from_date;
+        this.to_date = to_date;
+        this.posting_date = posting_date;
         this.currency = currency;
         this.base = base;
     }
@@ -48,12 +52,28 @@ public class SalaryStructAss {
         this.company = company;
     }
 
-    public LocalDate getFrom_date() {
+    public String getFrom_date() {
         return from_date;
     }
 
-    public void setFrom_date(LocalDate from_date) {
+    public void setFrom_date(String from_date) {
         this.from_date = from_date;
+    }
+
+    public String getTo_date() {
+        return to_date;
+    }
+
+    public void setTo_date(String to_date) {
+        this.to_date = to_date;
+    }
+
+    public String getPosting_date() {
+        return posting_date;
+    }
+
+    public void setPosting_date(String posting_date) {
+        this.posting_date = posting_date;
     }
 
     public String getCurrency() {
