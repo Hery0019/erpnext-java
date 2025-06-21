@@ -92,35 +92,42 @@ public class SalaryStructAssController {
         @RequestParam String from_date,  // date début
         @RequestParam String to_date,    // date fin
         @RequestParam String posting_date,
-        @RequestParam(required = false) String base,  // peut être null
+        @RequestParam(required = false) String base,  // peut être null ou vide
         @RequestParam String currency,
         Model model
     ) throws Exception {
-    
+
+        // ✅ Nettoyer base si vide ou seulement des espaces
+        if (base != null && base.trim().isEmpty()) {
+            base = null;
+        }
+
         // 🔑 Construire SalaryStructAss de base
         SalaryStructAss salaryStructAss = new SalaryStructAss();
         salaryStructAss.setEmployee(employee);
         salaryStructAss.setSalary_structure(salary_structure);
         salaryStructAss.setCompany(company);
         salaryStructAss.setCurrency(currency);
-        if (base != null && !base.isEmpty()) {
+
+        if (base != null) {
             salaryStructAss.setBase(new BigDecimal(base));
         }
-        // from_date & to_date pour la boucle, posting_date est utilisé pour chaque slip
+
         salaryStructAss.setPosting_date(posting_date);
-    
+
         // ✅ Appeler la nouvelle méthode generateSalary avec LocalDate
         LocalDate start = LocalDate.parse(from_date);
         LocalDate end = LocalDate.parse(to_date);
-    
+
         var slips = salaryStructAssService.generateSalary(salaryStructAss, start, end);
-    
+
         model.addAttribute("success",
             "Salary Slips générés : " + slips.size() + " slips créés de " + from_date + " à " + to_date
         );
-    
+
         return "redirect:/salary-struct-ass/generate-form";
     }
+
 
     
 }
