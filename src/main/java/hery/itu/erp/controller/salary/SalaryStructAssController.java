@@ -6,6 +6,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -38,14 +39,21 @@ public class SalaryStructAssController {
         this.employeeService = employeeService;
         this.stringConvertService = stringConvertService;
     }
-    
-    @GetMapping("/salary-struct-ass")
-    public String showSalaryStructAss(Model model) {
+
+    @GetMapping("/salary-struct-ass/list")
+    public String listSalaryStructureAssignments(Model model) throws Exception {
+        // Appel du service pour récupérer la liste
+        List<SalaryStructAss> assignments = salaryStructAssService.getAllSalaryStructureAssignments();
+        model.addAttribute("assignments", assignments);
+        return "salary-struct-ass";
+    }
+
+    @GetMapping("/salary-struct-ass/new")
+    public String showSalaryStructAssForm(Model model) {
         List<Employee> employees = employeeService.getImportantEmployees();
         model.addAttribute("employees", employees);
         return "salary-struct-ass-form";
     }
-
 
     @PostMapping("/salary-struct-ass/create")
     public String createSalaryStructAss(
@@ -128,6 +136,27 @@ public class SalaryStructAssController {
         return "redirect:/salary-struct-ass/generate-form";
     }
 
+    // ✅ Affiche le formulaire de modification pour un Salary Structure Assignment
+    @GetMapping("/salary-struct-ass/edit/{id}")
+    public String editSalaryStructAss(@PathVariable("id") String id, Model model) throws Exception {
+        // Récupère les infos depuis ERPNext via le service
+        SalaryStructAss ass = salaryStructAssService.getAssignmentById(id);
+        model.addAttribute("assignment", ass);
+        return "salary-struct-ass-edit"; // la page Thymeleaf qu'on va créer
+    }
 
+    // ✅ Soumet le formulaire modifié
+    @PostMapping("/salary-struct-ass/update")
+    public String updateSalaryStructAss(@ModelAttribute SalaryStructAss updatedAss, Model model) throws Exception {
+        salaryStructAssService.updateAssignment(updatedAss);
+        return "redirect:/salary-struct-ass/list";
+    }
+
+    // ✅ Supprime un Salary Structure Assignment
+    @GetMapping("/salary-struct-ass/delete/{id}")
+    public String deleteSalaryStructAss(@PathVariable("id") String id, Model model) throws Exception {
+        salaryStructAssService.deleteAssignment(id);
+        return "redirect:/salary-struct-ass/list";
+    }
     
 }

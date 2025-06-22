@@ -1,5 +1,6 @@
 package hery.itu.erp.service.salary;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import hery.itu.erp.model.salary.SalaryStructAss;
 import hery.itu.erp.service.login.LoginService;
@@ -7,6 +8,8 @@ import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -260,5 +263,336 @@ public class SalaryStructAssService {
     
         return null; // pas trouvé
     }
+
+    /**
+     * Annule un Salary Slip par son name (via run_method=cancel).
+     * @param slipName le nom du Salary Slip (ex: Sal Slip/EMP001/00001)
+     */
+    public void cancelSalarySlip(String slipName) throws Exception {
+        String cookie = loginService.getSessionCookie();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.add(HttpHeaders.COOKIE, cookie);
+
+        ResponseEntity<String> cancelResponse = restTemplate.exchange(
+                baseUrl + "/api/resource/Salary Slip/" + slipName + "?run_method=cancel",
+                HttpMethod.POST,
+                new HttpEntity<>(headers),
+                String.class);
+
+        if (!cancelResponse.getStatusCode().is2xxSuccessful()) {
+            throw new Exception("Erreur lors de l'annulation du Salary Slip : " + cancelResponse.getBody());
+        }
+
+        System.out.println("Salary Slip " + slipName + " annulé avec succès !");
+    }
+
+
+    /**
+     * Annule un Salary Structure Assignment par son name (via run_method=cancel).
+     * @param assignmentName le nom du Salary Structure Assignment (ex: HR-SSA-2025-00001)
+     */
+    public void cancelSalaryStructureAssignment(String assignmentName) throws Exception {
+        String cookie = loginService.getSessionCookie();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.add(HttpHeaders.COOKIE, cookie);
+
+        ResponseEntity<String> cancelResponse = restTemplate.exchange(
+                baseUrl + "/api/resource/Salary Structure Assignment/" + assignmentName + "?run_method=cancel",
+                HttpMethod.POST,
+                new HttpEntity<>(headers),
+                String.class);
+
+        if (!cancelResponse.getStatusCode().is2xxSuccessful()) {
+            throw new Exception("Erreur lors de l'annulation du Salary Structure Assignment : " + cancelResponse.getBody());
+        }
+
+        System.out.println("Salary Structure Assignment " + assignmentName + " annulé avec succès !");
+    }
+
+
+    public List<SalaryStructAss> getAllSalaryStructureAssignments() throws Exception {
+        String cookie = loginService.getSessionCookie();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.add(HttpHeaders.COOKIE, cookie);
+
+        ResponseEntity<String> response = restTemplate.exchange(
+                baseUrl + "/api/resource/Salary Structure Assignment?fields=[\"name\",\"employee_name\",\"salary_structure\",\"company\",\"currency\",\"base\",\"from_date\"]",
+                HttpMethod.GET,
+                new HttpEntity<>(headers),
+                String.class);
+
+        var arr = objectMapper.readTree(response.getBody()).path("data");
+        List<SalaryStructAss> assignments = new ArrayList<>();
+        for (JsonNode assignment : arr) {
+            SalaryStructAss salaryStructAss = new SalaryStructAss();
+            salaryStructAss.setName(assignment.path("name").asText());
+            salaryStructAss.setEmployee(assignment.path("employee_name").asText());
+            salaryStructAss.setSalary_structure(assignment.path("salary_structure").asText());
+            salaryStructAss.setCompany(assignment.path("company").asText());
+            salaryStructAss.setCurrency(assignment.path("currency").asText());
+            salaryStructAss.setBase(new BigDecimal(assignment.path("base").asDouble()));
+            salaryStructAss.setFrom_date(assignment.path("from_date").asText());
+            assignments.add(salaryStructAss);
+        }
+        return assignments;
+    }
+
+    /**
+     * Soumettre un Salary Structure Assignment par son name.
+     */
+    public void submitAssignment(String name) throws Exception {
+        String cookie = loginService.getSessionCookie();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.add(HttpHeaders.COOKIE, cookie);
+
+        String url = baseUrl + "/api/resource/Salary Structure Assignment/" + name + "?run_method=submit";
+
+        ResponseEntity<String> response = restTemplate.exchange(
+                url,
+                HttpMethod.POST,
+                new HttpEntity<>(headers),
+                String.class
+        );
+
+        if (!response.getStatusCode().is2xxSuccessful()) {
+            throw new Exception("Erreur lors de la soumission du Salary Structure Assignment : " + response.getBody());
+        }
+    }
+
+
+    /**
+     * Soumettre un Salary Slip par son name.
+     */
+    public void submitSalarySlip(String slipName) throws Exception {
+        String cookie = loginService.getSessionCookie();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.add(HttpHeaders.COOKIE, cookie);
+
+        String url = baseUrl + "/api/resource/Salary Slip/" + slipName + "?run_method=submit";
+
+        ResponseEntity<String> response = restTemplate.exchange(
+                url,
+                HttpMethod.POST,
+                new HttpEntity<>(headers),
+                String.class
+        );
+
+        if (!response.getStatusCode().is2xxSuccessful()) {
+            throw new Exception("Erreur lors de la soumission du Salary Slip : " + response.getBody());
+        }
+    }
+
     
+    /**
+     * Amend un Salary Structure Assignment en utilisant run_method=amend.
+     *
+     * @param assignmentName le nom du Salary Structure Assignment à amender
+     * @return le nom du nouveau Salary Structure Assignment créé par l'amend
+     * @throws Exception en cas d'erreur
+     */
+    public String amendSalaryStructureAssignment(String assignmentName) throws Exception {
+        String cookie = loginService.getSessionCookie();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.add(HttpHeaders.COOKIE, cookie);
+
+        String url = baseUrl + "/api/resource/Salary Structure Assignment/" + assignmentName + "?run_method=amend";
+
+        ResponseEntity<String> response = restTemplate.exchange(
+                url,
+                HttpMethod.POST,
+                new HttpEntity<>(headers),
+                String.class
+        );
+
+        if (!response.getStatusCode().is2xxSuccessful()) {
+            throw new Exception("Erreur lors de l'amend du Salary Structure Assignment : " + response.getBody());
+        }
+
+        // Extraire le nom du nouvel amendement créé
+        String newName = objectMapper.readTree(response.getBody()).path("message").asText();
+        System.out.println("Salary Structure Assignment amendé, nouveau : " + newName);
+
+        return newName;
+    }
+
+    /**
+     * Amend un Salary Slip en utilisant run_method=amend.
+     *
+     * @param slipName le nom du Salary Slip à amender
+     * @return le nom du nouveau Salary Slip créé par l'amend
+     * @throws Exception en cas d'erreur
+     */
+    public String amendSalarySlip(String slipName) throws Exception {
+        String cookie = loginService.getSessionCookie();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.add(HttpHeaders.COOKIE, cookie);
+
+        String url = baseUrl + "/api/resource/Salary Slip/" + slipName + "?run_method=amend";
+
+        ResponseEntity<String> response = restTemplate.exchange(
+                url,
+                HttpMethod.POST,
+                new HttpEntity<>(headers),
+                String.class
+        );
+
+        if (!response.getStatusCode().is2xxSuccessful()) {
+            throw new Exception("Erreur lors de l'amend du Salary Slip : " + response.getBody());
+        }
+
+        // Extraire le nom du nouvel amendement créé
+        String newName = objectMapper.readTree(response.getBody()).path("message").asText();
+        System.out.println("Salary Slip amendé, nouveau : " + newName);
+
+        return newName;
+    }
+
+
+    // ✅ Récupère un Salary Structure Assignment par son id
+    public SalaryStructAss getAssignmentById(String id) throws Exception {
+        String cookie = loginService.getSessionCookie();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.add(HttpHeaders.COOKIE, cookie);
+
+        String url = baseUrl + "/api/resource/Salary Structure Assignment/" + id;
+
+        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), String.class);
+
+        if (!response.getStatusCode().is2xxSuccessful()) {
+            throw new Exception("Erreur lors de la récupération : " + response.getBody());
+        }
+
+        return objectMapper.readValue(
+            objectMapper.readTree(response.getBody()).path("data").toString(),
+            SalaryStructAss.class
+        );
+    }
+
+  
+    /**
+     * Met à jour complètement un Salary Structure Assignment :
+     * - Annule si nécessaire
+     * - Supprime le Salary Slip lié
+     * - Supprime l'ancien SSA
+     * - Recrée SSA + Salary Slip mis à jour
+     *
+     * @param updatedAss l'objet mis à jour
+     * @return Map contenant {"assignment": nouveau SSA name, "slip": nouveau Salary Slip name}
+     * @throws Exception en cas d'erreur
+     */
+    public Map<String, Object> updateAssignment(SalaryStructAss updatedAss) throws Exception {
+        String cookie = loginService.getSessionCookie();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.add(HttpHeaders.COOKIE, cookie);
+
+        // 1️⃣ Vérifier docstatus de l'ancien SSA
+        String urlGet = baseUrl + "/api/resource/Salary Structure Assignment/" + updatedAss.getName();
+        ResponseEntity<String> getResponse = restTemplate.exchange(urlGet, HttpMethod.GET, new HttpEntity<>(headers), String.class);
+        if (!getResponse.getStatusCode().is2xxSuccessful()) {
+            throw new Exception("Erreur lors de la récupération du SSA : " + getResponse.getBody());
+        }
+
+        int docstatus = objectMapper.readTree(getResponse.getBody()).path("data").path("docstatus").asInt();
+
+        // 2️⃣ Chercher le Salary Slip lié pour cet employé et SSA
+        String slipQueryUrl = baseUrl + "/api/resource/Salary Slip?filters=" +
+                "[[\"Salary Slip\",\"salary_structure\",\"=\",\"" + updatedAss.getSalary_structure() + "\"]," +
+                "[\"Salary Slip\",\"employee\",\"=\",\"" + updatedAss.getEmployee() + "\"]]" +
+                "&fields=[\"name\"]&limit=1";
+
+        ResponseEntity<String> slipResponse = restTemplate.exchange(slipQueryUrl, HttpMethod.GET, new HttpEntity<>(headers), String.class);
+        String slipName = null;
+        var slipArr = objectMapper.readTree(slipResponse.getBody()).path("data");
+        if (slipArr.isArray() && slipArr.size() > 0) {
+            slipName = slipArr.get(0).path("name").asText();
+        }
+
+        // 3️⃣ Si soumis → annuler SSA
+        if (docstatus == 1) {
+            cancelSalaryStructureAssignment(updatedAss.getName());
+        }
+
+        // 4️⃣ Si Salary Slip existe → annuler et supprimer
+        if (slipName != null) {
+            cancelSalarySlip(slipName);
+
+            String slipDeleteUrl = baseUrl + "/api/resource/Salary Slip/" + slipName;
+            ResponseEntity<String> slipDeleteResponse = restTemplate.exchange(
+                    slipDeleteUrl,
+                    HttpMethod.DELETE,
+                    new HttpEntity<>(headers),
+                    String.class
+            );
+            if (!slipDeleteResponse.getStatusCode().is2xxSuccessful()) {
+                throw new Exception("Erreur lors de la suppression du Salary Slip : " + slipDeleteResponse.getBody());
+            }
+            System.out.println("Salary Slip " + slipName + " annulé et supprimé avec succès !");
+        }
+
+        // 5️⃣ Supprimer l'ancien SSA maintenant annulé ou brouillon
+        deleteAssignment(updatedAss.getName());
+
+        // 6️⃣ Créer nouveau SSA + Salary Slip mis à jour
+        Map<String, Object> result = createAssignmentAndSlip(updatedAss);
+
+        System.out.println("✅ Nouveau SSA et Salary Slip créés : " + result);
+        return result;
+    }
+
+
+    /**
+     * Supprime un Salary Structure Assignment :
+     * - Si soumis, l'annule d'abord puis supprime
+     * - Sinon supprime directement.
+     *
+     * @param assignmentName le nom du SSA à supprimer (ex : HR-SSA-2025-00004)
+     * @throws Exception en cas d'erreur
+     */
+    public void deleteAssignment(String assignmentName) throws Exception {
+        String cookie = loginService.getSessionCookie();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.add(HttpHeaders.COOKIE, cookie);
+
+        // 1️⃣ Vérifier docstatus
+        String urlGet = baseUrl + "/api/resource/Salary Structure Assignment/" + assignmentName;
+        ResponseEntity<String> getResponse = restTemplate.exchange(urlGet, HttpMethod.GET, new HttpEntity<>(headers), String.class);
+        if (!getResponse.getStatusCode().is2xxSuccessful()) {
+            throw new Exception("Erreur lors de la récupération : " + getResponse.getBody());
+        }
+
+        int docstatus = objectMapper.readTree(getResponse.getBody()).path("data").path("docstatus").asInt();
+
+        if (docstatus == 1) {
+            // 2️⃣ Annuler avant suppression si soumis
+            cancelSalaryStructureAssignment(assignmentName);
+        }
+
+        // 3️⃣ Supprimer
+        String urlDelete = baseUrl + "/api/resource/Salary Structure Assignment/" + assignmentName;
+
+        ResponseEntity<String> deleteResponse = restTemplate.exchange(
+                urlDelete,
+                HttpMethod.DELETE,
+                new HttpEntity<>(headers),
+                String.class
+        );
+
+        if (!deleteResponse.getStatusCode().is2xxSuccessful()) {
+            throw new Exception("Erreur lors de la suppression : " + deleteResponse.getBody());
+        }
+
+        System.out.println("Salary Structure Assignment " + assignmentName + " supprimé avec succès !");
+    }
+
+
 }

@@ -12,3 +12,5 @@ rah efa misy salaire entre le periode de dinganina
     element de salaire no safidina, misafidy < ou > de mapiditra montant
 
     manova salaire de base pour tester, afaka analana na anapina % (ajout ou retrait en %)
+
+    Ny aléa 2, dia mi filtre ny employé concerné, mi cancel salaire, mi créer vaovao 
