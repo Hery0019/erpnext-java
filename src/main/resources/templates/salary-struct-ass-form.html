@@ -158,6 +158,7 @@
         <a href="/salary-struct-ass/list">Salary Structure Assignments</a>
         <a href="/salaries">Salary Register</a>
         <a href="/salary-total">Salary Total</a>
+        <a href="/modification-groupe/show">Modification Groupe</a>
         <a href="/">Logout</a>
     </div>
 </nav>
@@ -173,7 +174,7 @@
         <form th:action="@{/salary-struct-ass/create}" th:object="${salaryStructAss}" method="post">
             <select name="employee" id="">
                 <option value="">-- Choose --</option>
-                <option th:each="employee : ${employees}" th:value="${employee.name}" th:text="${employee.first_name}"></option>
+                <option th:each="employee : ${employees}" th:value="${employee.name}" th:text="${employee.employee_name}"></option>
             </select>
             <label>Salary Structure:
                 <input type="text" name="salary_structure" required />

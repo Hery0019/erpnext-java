@@ -2,6 +2,9 @@ package hery.itu.erp.service.salary;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+
+import hery.itu.erp.model.salary.SalaryFilterDTO;
 import hery.itu.erp.model.salary.SalaryStructAss;
 import hery.itu.erp.service.login.LoginService;
 import org.springframework.boot.web.client.RestTemplateBuilder;
@@ -12,6 +15,8 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.math.BigDecimal;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.temporal.TemporalAdjusters;
 import java.util.*;
@@ -318,11 +323,20 @@ public class SalaryStructAssService {
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.add(HttpHeaders.COOKIE, cookie);
 
+        // ✅ 1) Construire filters JSON + fields JSON
+        String fields = "[\"name\",\"employee\",\"posting_date\",\"salary_structure_assignment\",\"earnings\",\"deductions\"]";
+
+        // ✅ 2) Encoder pour l'URL
+        String url = baseUrl + "/api/resource/Salary Slip"
+                + "?fields=" + URLEncoder.encode(fields, StandardCharsets.UTF_8);
+        // ✅ 3) Appel REST avec headers + cookie session
         ResponseEntity<String> response = restTemplate.exchange(
-                baseUrl + "/api/resource/Salary Structure Assignment?fields=[\"name\",\"employee_name\",\"salary_structure\",\"company\",\"currency\",\"base\",\"from_date\"]",
+                url,
                 HttpMethod.GET,
                 new HttpEntity<>(headers),
-                String.class);
+                String.class
+        );
+
 
         var arr = objectMapper.readTree(response.getBody()).path("data");
         List<SalaryStructAss> assignments = new ArrayList<>();
@@ -500,6 +514,8 @@ public class SalaryStructAssService {
         if (!getResponse.getStatusCode().is2xxSuccessful()) {
             throw new Exception("Erreur lors de la récupération du SSA : " + getResponse.getBody());
         }
+        
+        
 
         int docstatus = objectMapper.readTree(getResponse.getBody()).path("data").path("docstatus").asInt();
 
@@ -594,5 +610,153 @@ public class SalaryStructAssService {
         System.out.println("Salary Structure Assignment " + assignmentName + " supprimé avec succès !");
     }
 
+
+    /**
+     * Récupère toutes les valeurs d'un Salary Component pour un employé,
+     * filtrées par condition (inférieur ou supérieur) et un montant donné.
+     *
+     * @param employee le code employé
+     * @param salaryComponent le nom du Salary Component (ex: "Basic")
+     * @param condition "inf" ou "sup"
+     * @param montant le montant seuil
+     * @return Liste des montants trouvés
+     */
+    public List<SalaryFilterDTO> getSalaryComponentValues(String employee, String salaryComponent, String condition, double montant) throws Exception {
+        String filters = "[[\"employee\",\"=\",\"" + employee + "\"]]";
+        String fields = "[\"name\",\"employee\",\"posting_date\",\"salary_structure_assignment\",\"earnings\",\"deductions\"]";
+
+        String url = baseUrl + "/api/resource/Salary Slip"
+            + "?fields=" + URLEncoder.encode(fields, StandardCharsets.UTF_8)
+            + "&filters=" + URLEncoder.encode(filters, StandardCharsets.UTF_8);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.add("Cookie", loginService.getSessionCookie());
+
+        ResponseEntity<String> response = restTemplate.exchange(
+            url,
+            HttpMethod.GET,
+            new HttpEntity<>(headers),
+            String.class
+        );
+
+
+        if (!response.getStatusCode().is2xxSuccessful()) {
+            throw new RuntimeException("Erreur lors de la récupération des Salary Slips : " + response.getBody());
+        }
+
+        JsonNode result = objectMapper.readTree(response.getBody()).path("data");
+        List<SalaryFilterDTO> matchingResults = new ArrayList<>();
+
+        for (JsonNode slip : result) {
+            String slipName = slip.path("name").asText();
+            String postingDate = slip.path("posting_date").asText();
+            ArrayNode earnings = (ArrayNode) slip.path("earnings");
+
+            for (JsonNode earning : earnings) {
+                String comp = earning.path("salary_component").asText();
+                double amount = earning.path("amount").asDouble();
+                if (salaryComponent.equalsIgnoreCase(comp)) {
+                    boolean matches = "inf".equals(condition) ? amount < montant : amount > montant;
+                    if (matches) {
+                        matchingResults.add(new SalaryFilterDTO(
+                                slipName,
+                                employee,
+                                comp,
+                                amount,
+                                postingDate
+                        ));
+                    }
+                }
+            }
+        }
+
+        return matchingResults;
+    }
+
+    /**
+     * Récupère le nom du Salary Structure Assignment pour un employé à une date donnée.
+     * @param employee le code employé (ex: EMP001)
+     * @param postingDate la date du Salary Slip (ex: 2025-06-23)
+     * @return le nom du Salary Structure Assignment actif à cette date
+     */
+    public String getSalaryStructureAssignmentByEmployeeAndDate(SalaryFilterDTO salaryFilterDTO) throws Exception {
+        String url = baseUrl + "/api/resource/Salary Structure Assignment" +
+                "?fields=[\"name\",\"from_date\"]" +
+                "&filters=" + URLEncoder.encode(
+                    "[[\"employee\",\"=\",\"" + salaryFilterDTO.getEmployee() + "\"],[\"from_date\",\"<=\",\"" + salaryFilterDTO.getPostingDate() + "\"]]",
+                    StandardCharsets.UTF_8
+                ) +
+                "&order_by=from_date desc" +
+                "&limit_page_length=1";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.add("Cookie", loginService.getSessionCookie());
+
+        ResponseEntity<String> response = restTemplate.exchange(
+                url,
+                HttpMethod.GET,
+                new HttpEntity<>(headers),
+                String.class
+        );
+
+        if (!response.getStatusCode().is2xxSuccessful()) {
+            throw new RuntimeException("Erreur lors de la récupération du Salary Structure Assignment : " + response.getBody());
+        }
+
+        JsonNode data = objectMapper.readTree(response.getBody()).path("data");
+        if (data.isArray() && data.size() > 0) {
+            return data.get(0).path("name").asText();
+        } else {
+            throw new RuntimeException("Aucun Salary Structure Assignment trouvé pour l'employé à cette date.");
+        }
+    }
+
+
+
+    /**
+     * Applique une modification sur la base salariale d’un Salary Structure Assignment
+     * en fonction d’un Salary Component, d’une condition et d’un pourcentage.
+     *
+     * @param employees        la liste des employés concernés
+     * @param salaryComponent  le nom du Salary Component à cibler
+     * @param condition        "inf" ou "sup" (inférieur ou supérieur à un montant)
+     * @param montant          le montant seuil à comparer
+     * @param pourcentage      le pourcentage à appliquer (ajout ou retrait)
+     * @throws Exception en cas d’erreur ou d’assignation manquante
+     */
+    public void applyModification(List<String> employees, String salaryComponent, String condition, double montant, double pourcentage) throws Exception {
+        for (String employee : employees) {
+            List<SalaryFilterDTO> matchingResults = getSalaryComponentValues(employee, salaryComponent, condition, montant);
+
+            for (SalaryFilterDTO result : matchingResults) {
+                // 🔍 Récupère le nom de l'Assignment actif à cette date
+                String assignmentName = getSalaryStructureAssignmentByEmployeeAndDate(result);
+
+                // 📦 Récupère l’objet complet SalaryStructAss
+                SalaryStructAss salaryStructAss = getAssignmentById(assignmentName);
+
+                if (salaryStructAss == null || salaryStructAss.getBase() == null) {
+                    continue; // passe si aucune base trouvée
+                }
+
+                BigDecimal base = salaryStructAss.getBase();
+                BigDecimal percentage = BigDecimal.valueOf(pourcentage).divide(BigDecimal.valueOf(100));
+
+                BigDecimal adjustment;
+                if ("inf".equals(condition)) {
+                    adjustment = base.subtract(base.multiply(percentage));
+                } else if ("sup".equals(condition)) {
+                    adjustment = base.add(base.multiply(percentage));
+                } else {
+                    continue; // condition invalide
+                }
+
+                salaryStructAss.setBase(adjustment);
+                updateAssignment(salaryStructAss); // ✏️ Mets à jour (via cancel + create + submit)
+            }
+        }
+    }
 
 }

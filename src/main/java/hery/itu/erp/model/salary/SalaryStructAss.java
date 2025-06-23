@@ -27,6 +27,8 @@ public class SalaryStructAss {
     private BigDecimal variable;
     private BigDecimal taxable_earnings_till_date;
     private BigDecimal tax_deducted_till_date;
+    private String salary_component;
+    private String salary_component_amount;
 
     // ✅ Constructeur vide obligatoire
     public SalaryStructAss() {
@@ -194,4 +196,19 @@ public class SalaryStructAss {
         this.tax_deducted_till_date = tax_deducted_till_date;
     }
 
+    public String getSalary_component() {
+        return salary_component;
+    }
+
+    public void setSalary_component(String salary_component) {
+        this.salary_component = salary_component;
+    }
+    
+    public String getSalary_component_amount() {
+        return salary_component_amount;
+    }
+
+    public void setSalary_component_amount(String salary_component_amount) {
+        this.salary_component_amount = salary_component_amount;
+    }
 }

@@ -162,6 +162,7 @@
             <a href="/salary-struct-ass/list">Salary Structure Assignments</a>
             <a href="/salaries">Salary Register</a>
             <a href="/salary-total">Salary Total</a>
+            <a href="/modification-groupe/show">Modification Groupe</a>
             <a href="/">Logout</a>
         </div>
     </nav>
@@ -178,7 +179,7 @@
                     <div th:each="emp : ${employees}">
                         <label style="display: flex; align-items: center; gap: 6px;">
                             <input type="checkbox" name="employees" th:value="${emp.name}">
-                            <span th:text="${emp.first_name}"> YeSSS</span>
+                            <span th:text="${emp.employee_name}"></span>
                         </label>
                     </div>
                 </div>
@@ -186,8 +187,8 @@
             </div>
         
             <div class="form-group">
-                <label>Element Salaire :</label>
-                <select name="salary_component">
+                <label>If Element Salaire :</label>
+                <select name="salary_component" required>
                     <option value="">-- Choose --</option>
                     <option th:each="component : ${salaryComponents}" 
                             th:value="${component}" 
@@ -198,7 +199,7 @@
         
             <div class="form-group">
                 <label>Condition :</label>
-                <select name="condition">
+                <select name="condition" required>
                     <option value="">-- Choose --</option>
                     <option value="inf">Inférieur à</option>
                     <option value="sup">Supérieur à</option>
@@ -207,12 +208,12 @@
         
             <div class="form-group">
                 <label>Montant :</label>
-                <input type="number" name="montant" min="0" placeholder="Enter amount" />
+                <input type="number" name="montant" min="0" placeholder="Enter amount" required />
             </div>
         
             <div class="form-group">
                 <label>Condition :</label>
-                <select name="condition">
+                <select name="condition" required>
                     <option value="">-- Choose --</option>
                     <option value="ajouter">Ajouter</option>
                     <option value="retirer">Retirer</option>
@@ -221,11 +222,11 @@
 
             <div class="form-group">
                 <label>Pourcentage :</label>
-                <input type="number" name="pourcentage" min="0" placeholder="Enter percentage" />
+                <input type="number" name="pourcentage" min="0" placeholder="Enter percentage" required />
             </div>
 
             <div class="form-actions">
-                <button type="submit">Filter</button>
+                <button type="submit">Apply</button>
             </div>
         </form>
         
