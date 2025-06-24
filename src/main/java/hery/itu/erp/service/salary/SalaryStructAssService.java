@@ -610,102 +610,165 @@ public class SalaryStructAssService {
         System.out.println("Salary Structure Assignment " + assignmentName + " supprimé avec succès !");
     }
 
-
     /**
      * Récupère toutes les valeurs d'un Salary Component pour un employé,
      * filtrées par condition (inférieur ou supérieur) et un montant donné.
-     *
-     * @param employee le code employé
-     * @param salaryComponent le nom du Salary Component (ex: "Basic")
-     * @param condition "inf" ou "sup"
-     * @param montant le montant seuil
-     * @return Liste des montants trouvés
+     * Utilise get_list + get pour contourner les restrictions ERPNext.
+     * Ajout de System.out.println pour debug complet.
      */
     public List<SalaryFilterDTO> getSalaryComponentValues(String employee, String salaryComponent, String condition, double montant) throws Exception {
-        String filters = "[[\"employee\",\"=\",\"" + employee + "\"]]";
-        String fields = "[\"name\",\"employee\",\"posting_date\",\"salary_structure_assignment\",\"earnings\",\"deductions\"]";
 
-        String url = baseUrl + "/api/resource/Salary Slip"
-            + "?fields=" + URLEncoder.encode(fields, StandardCharsets.UTF_8)
-            + "&filters=" + URLEncoder.encode(filters, StandardCharsets.UTF_8);
+        System.out.println("=== Début getSalaryComponentValues ===");
+        System.out.println("Paramètres : employee = " + employee + ", salaryComponent = " + salaryComponent + ", condition = " + condition + ", montant = " + montant);
+
+        // ---------------------------
+        // 1) get_list : récupère les Salary Slip autorisés
+        // ---------------------------
+        String filters = "[[\"employee\",\"=\",\"" + employee + "\"]]";
+        String fields = "[\"name\",\"employee\",\"posting_date\"]";
+
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("doctype", "Salary Slip");
+        payload.put("filters", objectMapper.readTree(filters));
+        payload.put("fields", objectMapper.readTree(fields));
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.add("Cookie", loginService.getSessionCookie());
+        headers.add(HttpHeaders.COOKIE, loginService.getSessionCookie());
 
-        ResponseEntity<String> response = restTemplate.exchange(
-            url,
-            HttpMethod.GET,
-            new HttpEntity<>(headers),
+        ResponseEntity<String> listResponse = restTemplate.exchange(
+            baseUrl + "/api/method/frappe.client.get_list",
+            HttpMethod.POST,
+            new HttpEntity<>(payload, headers),
             String.class
         );
 
-
-        if (!response.getStatusCode().is2xxSuccessful()) {
-            throw new RuntimeException("Erreur lors de la récupération des Salary Slips : " + response.getBody());
+        if (!listResponse.getStatusCode().is2xxSuccessful()) {
+            throw new RuntimeException("Erreur lors du get_list : " + listResponse.getBody());
         }
 
-        JsonNode result = objectMapper.readTree(response.getBody()).path("data");
+        JsonNode slips = objectMapper.readTree(listResponse.getBody()).path("message");
+        System.out.println("Nombre de slips trouvés : " + slips.size());
+
         List<SalaryFilterDTO> matchingResults = new ArrayList<>();
 
-        for (JsonNode slip : result) {
+        // ---------------------------
+        // 2) get pour chaque slip pour avoir tous les champs
+        // ---------------------------
+        for (JsonNode slip : slips) {
             String slipName = slip.path("name").asText();
-            String postingDate = slip.path("posting_date").asText();
-            ArrayNode earnings = (ArrayNode) slip.path("earnings");
+            System.out.println("Récupération du slip : " + slipName);
 
+            // Appel GET pour ce slip
+            ResponseEntity<String> slipResponse = restTemplate.exchange(
+                baseUrl + "/api/resource/Salary Slip/" + slipName,
+                HttpMethod.GET,
+                new HttpEntity<>(headers),
+                String.class
+            );
+
+            if (!slipResponse.getStatusCode().is2xxSuccessful()) {
+                throw new RuntimeException("Erreur get Salary Slip " + slipName + " : " + slipResponse.getBody());
+            }
+
+            JsonNode slipDetails = objectMapper.readTree(slipResponse.getBody()).path("data");
+
+            String postingDate = slipDetails.path("posting_date").asText();
+            System.out.println(" - Posting Date : " + postingDate);
+
+            ArrayNode earnings = (ArrayNode) slipDetails.path("earnings");
+            ArrayNode deductions = (ArrayNode) slipDetails.path("deductions");
+
+            // Vérifie earnings
             for (JsonNode earning : earnings) {
                 String comp = earning.path("salary_component").asText();
                 double amount = earning.path("amount").asDouble();
+                System.out.println("   Checking earning: component = " + comp + ", amount = " + amount);
                 if (salaryComponent.equalsIgnoreCase(comp)) {
                     boolean matches = "inf".equals(condition) ? amount < montant : amount > montant;
+                    System.out.println("     -> Comparaison : amount = " + amount + " | montant = " + montant + " | condition = " + condition + " | matches ? " + matches);
                     if (matches) {
-                        matchingResults.add(new SalaryFilterDTO(
-                                slipName,
-                                employee,
-                                comp,
-                                amount,
-                                postingDate
-                        ));
+                        SalaryFilterDTO dto = new SalaryFilterDTO(
+                            slipName,
+                            employee,
+                            comp,
+                            amount,
+                            postingDate
+                        );
+                        System.out.println("     => Ajouté : " + dto);
+                        matchingResults.add(dto);
+                    }
+                }
+            }
+
+            // Vérifie deductions aussi
+            for (JsonNode deduction : deductions) {
+                String comp = deduction.path("salary_component").asText();
+                double amount = deduction.path("amount").asDouble();
+                System.out.println("   Checking deduction: component = " + comp + ", amount = " + amount);
+                if (salaryComponent.equalsIgnoreCase(comp)) {
+                    boolean matches = "inf".equals(condition) ? amount < montant : amount > montant;
+                    System.out.println("     -> Matches condition ? " + matches);
+                    if (matches) {
+                        SalaryFilterDTO dto = new SalaryFilterDTO(
+                            slipName,
+                            employee,
+                            comp,
+                            amount,
+                            postingDate
+                        );
+                        System.out.println("     => Ajouté : " + dto);
+                        matchingResults.add(dto);
                     }
                 }
             }
         }
 
+        System.out.println("=== Fin getSalaryComponentValues : Total résultats = " + matchingResults.size() + " ===");
         return matchingResults;
     }
 
+
+
+
     /**
      * Récupère le nom du Salary Structure Assignment pour un employé à une date donnée.
-     * @param employee le code employé (ex: EMP001)
-     * @param postingDate la date du Salary Slip (ex: 2025-06-23)
-     * @return le nom du Salary Structure Assignment actif à cette date
+     * Version robuste : utilise POST sur get_list.
      */
     public String getSalaryStructureAssignmentByEmployeeAndDate(SalaryFilterDTO salaryFilterDTO) throws Exception {
-        String url = baseUrl + "/api/resource/Salary Structure Assignment" +
-                "?fields=[\"name\",\"from_date\"]" +
-                "&filters=" + URLEncoder.encode(
-                    "[[\"employee\",\"=\",\"" + salaryFilterDTO.getEmployee() + "\"],[\"from_date\",\"<=\",\"" + salaryFilterDTO.getPostingDate() + "\"]]",
-                    StandardCharsets.UTF_8
-                ) +
-                "&order_by=from_date desc" +
-                "&limit_page_length=1";
+        // ✅ Construire le payload JSON correct
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("doctype", "Salary Structure Assignment");
+        payload.put("fields", Arrays.asList("name", "from_date"));
+        payload.put("filters", Arrays.asList(
+            Arrays.asList("employee", "=", salaryFilterDTO.getEmployee()),
+            Arrays.asList("from_date", "<=", salaryFilterDTO.getPostingDate())
+        ));
+        payload.put("order_by", "from_date desc");
+        payload.put("limit_page_length", 1);
 
+        // ✅ Préparer les headers avec le cookie de session ERPNext
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.add("Cookie", loginService.getSessionCookie());
 
+        // ✅ Appeler POST sur frappe.client.get_list
         ResponseEntity<String> response = restTemplate.exchange(
-                url,
-                HttpMethod.GET,
-                new HttpEntity<>(headers),
-                String.class
+            baseUrl + "/api/method/frappe.client.get_list",
+            HttpMethod.POST,
+            new HttpEntity<>(payload, headers),
+            String.class
         );
 
         if (!response.getStatusCode().is2xxSuccessful()) {
-            throw new RuntimeException("Erreur lors de la récupération du Salary Structure Assignment : " + response.getBody());
+            throw new RuntimeException("Erreur get_list Salary Structure Assignment : " + response.getBody());
         }
 
-        JsonNode data = objectMapper.readTree(response.getBody()).path("data");
+        // ✅ Lire la réponse JSON (champ 'message' pour get_list)
+        JsonNode data = objectMapper.readTree(response.getBody()).path("message");
+
+        System.out.println("==> Résultat get_list SSA pour " + salaryFilterDTO.getEmployee() + " à la date " + salaryFilterDTO.getPostingDate() + ": " + data);
+
         if (data.isArray() && data.size() > 0) {
             return data.get(0).path("name").asText();
         } else {
@@ -715,48 +778,85 @@ public class SalaryStructAssService {
 
 
 
-    /**
+
+   /**
      * Applique une modification sur la base salariale d’un Salary Structure Assignment
      * en fonction d’un Salary Component, d’une condition et d’un pourcentage.
      *
-     * @param employees        la liste des employés concernés
-     * @param salaryComponent  le nom du Salary Component à cibler
-     * @param condition        "inf" ou "sup" (inférieur ou supérieur à un montant)
-     * @param montant          le montant seuil à comparer
-     * @param pourcentage      le pourcentage à appliquer (ajout ou retrait)
+     * @param employees       la liste des employés concernés
+     * @param salaryComponent le nom du Salary Component à cibler
+     * @param condition       "inf" ou "sup" (inférieur ou supérieur à un montant)
+     * @param montant         le montant seuil à comparer
+     * @param then            "ajouter" ou "retirer" pour appliquer la modification
+     * @param pourcentage     le pourcentage à appliquer
      * @throws Exception en cas d’erreur ou d’assignation manquante
      */
-    public void applyModification(List<String> employees, String salaryComponent, String condition, double montant, double pourcentage) throws Exception {
+    public void applyModification(List<String> employees, String salaryComponent, String condition, String then, double montant, double pourcentage) throws Exception {
+        System.out.println("=== APPLY MODIFICATION ===");
+        System.out.println("Target Salary Component: " + salaryComponent);
+        System.out.println("Condition: " + condition);
+        System.out.println("Action (then): " + then);
+        System.out.println("Seuil montant: " + montant);
+        System.out.println("Pourcentage: " + pourcentage + "%");
+        System.out.println("-------------------------------");
+
         for (String employee : employees) {
+            System.out.println(">> Employee: " + employee);
+
+            // Récupère tous les Salary Slip components qui matchent pour cet employé
             List<SalaryFilterDTO> matchingResults = getSalaryComponentValues(employee, salaryComponent, condition, montant);
+            System.out.println("  Found " + matchingResults.size() + " matching slips for employee " + employee);
 
             for (SalaryFilterDTO result : matchingResults) {
-                // 🔍 Récupère le nom de l'Assignment actif à cette date
+                System.out.println("   -> Slip: " + result.getSlipName() +
+                        ", Component: " + result.getSalaryComponent() +
+                        ", Amount: " + result.getAmount() +
+                        ", Posting Date: " + result.getPostingDate());
+
+                // Cherche l'Assignment actif à cette date
                 String assignmentName = getSalaryStructureAssignmentByEmployeeAndDate(result);
+                System.out.println("   => Matching Assignment: " + assignmentName);
 
-                // 📦 Récupère l’objet complet SalaryStructAss
                 SalaryStructAss salaryStructAss = getAssignmentById(assignmentName);
-
-                if (salaryStructAss == null || salaryStructAss.getBase() == null) {
-                    continue; // passe si aucune base trouvée
+                if (salaryStructAss == null) {
+                    System.out.println("   [!] WARNING: Salary Structure Assignment not found, skipping.");
+                    continue;
                 }
 
                 BigDecimal base = salaryStructAss.getBase();
-                BigDecimal percentage = BigDecimal.valueOf(pourcentage).divide(BigDecimal.valueOf(100));
+                if (base == null) {
+                    System.out.println("   [!] WARNING: Base salary is null, skipping.");
+                    continue;
+                }
 
+                System.out.println("      Original base: " + base);
+
+                BigDecimal percentage = BigDecimal.valueOf(pourcentage).divide(BigDecimal.valueOf(100));
                 BigDecimal adjustment;
-                if ("inf".equals(condition)) {
+                if ("retirer".equals(then)) {
                     adjustment = base.subtract(base.multiply(percentage));
-                } else if ("sup".equals(condition)) {
+                    System.out.println("      Action: RETIRER -> New base = " + adjustment);
+                } else if ("ajouter".equals(then)) {
                     adjustment = base.add(base.multiply(percentage));
+                    System.out.println("      Action: AJOUTER -> New base = " + adjustment);
                 } else {
-                    continue; // condition invalide
+                    System.out.println("   [!] Invalid 'then' condition: " + then + ", skipping.");
+                    continue;
                 }
 
                 salaryStructAss.setBase(adjustment);
-                updateAssignment(salaryStructAss); // ✏️ Mets à jour (via cancel + create + submit)
+                System.out.println("   [✓] Updating Assignment with new base...");
+
+                updateAssignment(salaryStructAss);
+
+                System.out.println("   [✓] Update DONE for Assignment: " + assignmentName);
             }
+
+            System.out.println("-------------------------------");
         }
+
+        System.out.println("=== APPLY MODIFICATION DONE ===");
     }
+
 
 }

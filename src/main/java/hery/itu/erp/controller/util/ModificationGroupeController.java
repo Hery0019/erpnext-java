@@ -4,6 +4,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.ui.Model;
 
 import hery.itu.erp.service.salary.SalaryComponentService;
@@ -31,30 +32,42 @@ public class ModificationGroupeController {
         return "modification_groupe";
     }
 
-      /**
-     * Traite le formulaire après soumission
-     */
-    @PostMapping("/modification-grouper/execute")
+    @PostMapping("/modification-groupe/execute")
     public String executeModification(
             @RequestParam("employees") List<String> employees,
             @RequestParam("salary_component") String salaryComponent,
             @RequestParam("condition") String condition,
+            @RequestParam("then") String then,
             @RequestParam("montant") double montant,
             @RequestParam("pourcentage") double pourcentage,
-            Model model) throws Exception {
+            RedirectAttributes redirectAttributes) throws Exception {
 
-        // Appelle ton service métier pour appliquer la modification groupe
+        // Appelle ton service pour appliquer la modification
         salaryStructAssService.applyModification(
                 employees,
                 salaryComponent,
                 condition,
+                then,
                 montant,
                 pourcentage
         );
 
-        // Message de succès ou redirection
-        model.addAttribute("message", "Modification appliquée avec succès !");
-        return "redirect:/modification-grouper/show";
+        // Construis un message de succès détaillé
+        String successMessage = String.format(
+                "Modification appliquée avec succès ! %d employé(s) mis à jour : composant '%s', condition '%s', action '%s', seuil %.2f, pourcentage %.2f%%.",
+                employees.size(),
+                salaryComponent,
+                condition,
+                then,
+                montant,
+                pourcentage
+        );
+
+        // Utilise RedirectAttributes pour que le message survive à la redirection
+        redirectAttributes.addFlashAttribute("success", successMessage);
+
+        return "redirect:/modification-groupe/show";
     }
+
    
 }

@@ -172,7 +172,7 @@
             <h1>Modification Groupe</h1>
         </div>
 
-        <form th:action="@{/modification-grouper/execute}" method="post">
+        <form th:action="@{/modification-groupe/execute}" method="post">
             <div class="form-group">
                 <label>Employees :</label>
                 <div style="border: 1px solid #ccc; padding: 10px; border-radius: 4px; max-height: 150px; overflow-y: auto;">
@@ -201,32 +201,32 @@
                 <label>Condition :</label>
                 <select name="condition" required>
                     <option value="">-- Choose --</option>
-                    <option value="inf">Inférieur à</option>
+                    <option value="inf" selected>Inférieur à</option>
                     <option value="sup">Supérieur à</option>
                 </select>
             </div>
         
             <div class="form-group">
                 <label>Montant :</label>
-                <input type="number" name="montant" min="0" placeholder="Enter amount" required />
+                <input type="number" name="montant" min="0" placeholder="Enter amount" value="456000" required />
             </div>
         
             <div class="form-group">
                 <label>Condition :</label>
-                <select name="condition" required>
+                <select name="then" required>
                     <option value="">-- Choose --</option>
                     <option value="ajouter">Ajouter</option>
-                    <option value="retirer">Retirer</option>
+                    <option value="retirer" selected>Retirer</option>
                 </select>
             </div>
 
             <div class="form-group">
                 <label>Pourcentage :</label>
-                <input type="number" name="pourcentage" min="0" placeholder="Enter percentage" required />
+                <input type="number" name="pourcentage" min="0" placeholder="Enter percentage" value="10" required />
             </div>
 
             <div class="form-actions">
-                <button type="submit">Apply</button>
+                <input type="submit" value="Apply">
             </div>
         </form>
         
