@@ -148,8 +148,10 @@
     <div>
         <a href="/import">Import</a>
         <a href="/employes">Employee</a>
+        <a href="/salary-struct-ass">Salary Structure Assignement</a>
         <a href="/salaries">Salary Register</a>
         <a href="/salary-total">Salary Total</a>
+        <a href="/modification-groupe/show">Modification Groupe</a>
         <a href="/">Logout</a>
     </div>
 </nav>
@@ -161,16 +163,46 @@
     <form method="get" action="/salaries/report">
         <div class="form-group">
             <label for="from">From :</label>
-            <input type="date" id="from" name="from" th:value="${fromDate}" />
+            <input type="date" id="from" name="from" value="2025-01-01" />
         </div>
         <div class="form-group">
             <label for="to">To :</label>
-            <input type="date" id="to" name="to" th:value="${toDate}" />
+            <input type="date" id="to" name="to" value="2025-12-31" />
         </div>
         <div class="form-group">
             <label for="company">Company :</label>
-            <input type="text" id="company" name="company" th:value="${company}" />
+            <input type="text" id="company" name="company" value="Orinasa SA" />
         </div>
+        <select name="employee" id="">
+            <option value="">-- Choose --</option>
+            <option th:each="employee : ${employees}" th:value="${employee.name}" th:text="${employee.employee_name + ' from ' + employee.date_of_joining}"></option>
+        </select>
+
+        <div class="form-group">
+            <label>If Element Salaire :</label>
+            <select name="salary_component" required>
+                <option value="">-- Choose --</option>
+                <option th:each="component : ${salaryComponents}" 
+                        th:value="${component}" 
+                        th:text="${component}"></option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="signe"> Signe :</label>
+                <select name="signe" id="signe">
+                    <option value="inf"> < </option>
+                    <option value="sup"> > </option>
+                    <option value="infegal"> <= </option>
+                    <option value="supegal"> >= </option>
+                </select>
+        </div>
+
+        <div class="form-group">
+            <label>Combien :</label>
+            <input type="number" name="combien" min="0" placeholder="Enter amount" value="456000" required />
+        </div>
+
         <div class="form-actions">
             <button type="submit">Filter</button>
         </div>

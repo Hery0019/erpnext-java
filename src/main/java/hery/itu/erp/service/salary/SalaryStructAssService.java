@@ -12,8 +12,6 @@ import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import org.springframework.web.bind.annotation.RequestParam;
-
 import java.math.BigDecimal;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -201,49 +199,186 @@ public class SalaryStructAssService {
         return result;
     }
 
-    public List<String> generateSalary(SalaryStructAss salaryStructAss, LocalDate startDate, LocalDate endDate) throws Exception {
-        List<String> generatedSlips = new ArrayList<>();
+    /**
+     * Vérifie s'il existe déjà un Salary Slip pour l'employé et la période donnée.
+     *
+     * @param employee employé concerné
+     * @param startDate date de début du slip
+     * @param endDate date de fin du slip
+     * @return true s'il existe déjà un slip pour cette période
+     * @throws Exception en cas d'erreur d'appel
+     */
+    private boolean salarySlipExists(String employee, String startDate, String endDate) throws Exception {
+        String cookie = loginService.getSessionCookie();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.add(HttpHeaders.COOKIE, cookie);
 
+        String url = baseUrl + "/api/resource/Salary Slip?filters=" +
+                "[[\"Salary Slip\",\"employee\",\"=\",\"" + employee + "\"]," +
+                "[\"Salary Slip\",\"start_date\",\"=\",\"" + startDate + "\"]," +
+                "[\"Salary Slip\",\"end_date\",\"=\",\"" + endDate + "\"]]";
+
+        ResponseEntity<String> response = restTemplate.exchange(
+                url,
+                HttpMethod.GET,
+                new HttpEntity<>(headers),
+                String.class
+        );
+
+        var arr = objectMapper.readTree(response.getBody()).path("data");
+        return arr.isArray() && arr.size() > 0;
+    }
+
+    public boolean salaryAssignmentExists(String employeeId, String fromDate) {
+        String url = "http://erpnext.localhost:8000/api/resource/Salary Structure Assignment?fields=[\"name\"]&filters=[[\"employee\",\"=\",\"" + employeeId + "\"],[\"from_date\",\"=\",\"" + fromDate + "\"]]";
+        
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Cookie", loginService.getSessionCookie());
+    
+        HttpEntity<String> entity = new HttpEntity<>(headers);
+        try {
+            ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+            List<Map<String, Object>> data = (List<Map<String, Object>>) response.getBody().get("data");
+            return data != null && !data.isEmpty();
+        } catch (Exception e) {
+            System.err.println("Erreur lors de la vérification de Salary Assignment : " + e.getMessage());
+            return false;
+        }
+    }
+    
+    public List<String> generateSalary(SalaryStructAss salaryStructAss, LocalDate startDate, LocalDate endDate, String ecraser, String moyenne) throws Exception {
+        List<String> generatedSlips = new ArrayList<>();
         BigDecimal base = salaryStructAss.getBase();
-        System.out.println("Base fournie par l'employee " + salaryStructAss.getEmployee() + " : " + base);
+    
+        System.out.println("Base fournie par l'employé " + salaryStructAss.getEmployee() + " : " + base);
+    
+        if (base == null && "oui".equalsIgnoreCase(moyenne)) {
+            base = getMoyenneTotalBaseOfAllEmployees();
+            System.out.println("Base moyenne utilisée : " + base);
+        }
+    
         if (base == null) {
             Double lastBase = getLastSalaryBase(salaryStructAss.getEmployee());
             if (lastBase != null) {
                 base = BigDecimal.valueOf(lastBase);
-                System.out.println("Base null donc recherche du dernier base");
-                System.out.println("Dernier base trouvée pour l'employé " + salaryStructAss.getEmployee() + " : " + base);
+                System.out.println("Base récupérée depuis la dernière assignment : " + base);
             } else {
                 throw new Exception("Base introuvable pour l'employé : " + salaryStructAss.getEmployee());
             }
         }
-
-
+    
         LocalDate current = startDate.withDayOfMonth(1);
         LocalDate limit = endDate.withDayOfMonth(1);
-
+    
         while (!current.isAfter(limit)) {
             LocalDate slipStart = current;
             LocalDate slipEnd = current.with(TemporalAdjusters.lastDayOfMonth());
-
+    
+            boolean slipExists = salarySlipExists(salaryStructAss.getEmployee(), slipStart.toString(), slipEnd.toString());
+            boolean assignmentExists = salaryAssignmentExists(salaryStructAss.getEmployee(), slipStart.toString());
+    
             SalaryStructAss slipAss = new SalaryStructAss();
             slipAss.setEmployee(salaryStructAss.getEmployee());
             slipAss.setSalary_structure(salaryStructAss.getSalary_structure());
             slipAss.setCompany(salaryStructAss.getCompany());
             slipAss.setCurrency(salaryStructAss.getCurrency());
             slipAss.setBase(base);
-            System.out.println("Base dans l'objet slipAss : " + slipAss.getBase());
             slipAss.setFrom_date(slipStart.toString());
             slipAss.setTo_date(slipEnd.toString());
             slipAss.setPosting_date(slipEnd.toString());
-
-            Map<String, Object> result = createAssignmentAndSlip(slipAss);
-            generatedSlips.add(result.get("slip").toString());
-
+    
+            try {
+                if (slipExists && !"oui".equalsIgnoreCase(ecraser)) {
+                    System.out.println("Slip déjà existant pour " + slipStart.getMonth() + "/" + slipStart.getYear() + " -> ignoré");
+                } else {
+                    if (assignmentExists && "oui".equalsIgnoreCase(ecraser)) {
+                        slipAss.setName(getAssignmentNameBySalaryStructure(salaryStructAss.getSalary_structure()));
+                        Map<String, Object> result = updateAssignment(slipAss);
+                        generatedSlips.add(result.get("slip").toString());
+                        System.out.println("Slip mis à jour pour : " + slipStart);
+                    } else if (!assignmentExists) {
+                        Map<String, Object> result = createAssignmentAndSlip(slipAss);
+                        generatedSlips.add(result.get("slip").toString());
+                        System.out.println("Slip créé pour : " + slipStart);
+                    } else {
+                        System.out.println("Assignment déjà existant et écrasement non autorisé -> ignoré pour " + slipStart);
+                    }
+                }
+            } catch (Exception e) {
+                System.err.println("Erreur lors de la génération du slip pour " + slipStart + " : " + e.getMessage());
+            }
+    
             current = current.plusMonths(1);
         }
-
+    
         return generatedSlips;
     }
+    
+    
+
+    // public List<String> generateSalary(SalaryStructAss salaryStructAss, LocalDate startDate, LocalDate endDate, String ecraser, String moyenne) throws Exception {
+    //     List<String> generatedSlips = new ArrayList<>();
+    
+    //     BigDecimal base = salaryStructAss.getBase();
+    //     SalaryStructAss slipAss = new SalaryStructAss();
+
+    //     System.out.println("Base fournie par l'employé " + salaryStructAss.getEmployee() + " : " + base);
+
+    //     if (base == null) {
+    //         if (moyenne.equals("oui")) {
+    //             base = getMoyenneBase();
+    //             System.out.println("Base moyenne : " + base);
+    //         }
+    //     }
+    //     if (base == null) {
+    //         Double lastBase = getLastSalaryBase(salaryStructAss.getEmployee());
+    //         if (lastBase != null) {
+    //             base = BigDecimal.valueOf(lastBase);
+    //             System.out.println("Base null, recherche du dernier base : " + base);
+    //         } else {
+    //             throw new Exception("Base introuvable pour l'employé : " + salaryStructAss.getEmployee());
+    //         }
+    //     }
+    
+    //     LocalDate current = startDate.withDayOfMonth(1);
+    //     LocalDate limit = endDate.withDayOfMonth(1);
+    
+    //     while (!current.isAfter(limit)) {
+    //         LocalDate slipStart = current;
+    //         LocalDate slipEnd = current.with(TemporalAdjusters.lastDayOfMonth());
+    
+    //         // ✅ Vérifier s'il y a déjà un Salary Slip pour ce mois pour cet employé
+    //         if (salarySlipExists(salaryStructAss.getEmployee(), slipStart.toString(), slipEnd.toString())) {
+    //             if (!ecraser.equals("oui"))  { // donc ne pas ecraser
+    //                 System.out.println("Ecraser est :" + ecraser);
+    //                 System.out.println("Salary Slip déjà existant pour le mois : " + slipStart.getMonth() + " " + slipStart.getYear() + " -> skip");
+    //                 current = current.plusMonths(1);
+    //                 continue;
+    //             }
+
+    //             if (ecraser.equals("oui")) {
+                    
+    //             }
+    //         }
+    
+    //         slipAss.setEmployee(salaryStructAss.getEmployee());
+    //         slipAss.setSalary_structure(salaryStructAss.getSalary_structure());
+    //         slipAss.setCompany(salaryStructAss.getCompany());
+    //         slipAss.setCurrency(salaryStructAss.getCurrency());
+    //         slipAss.setBase(base);
+    //         slipAss.setFrom_date(slipStart.toString());
+    //         slipAss.setTo_date(slipEnd.toString());
+    //         slipAss.setPosting_date(slipEnd.toString());
+    
+    //         Map<String, Object> result = createAssignmentAndSlip(slipAss);
+    //         generatedSlips.add(result.get("slip").toString());
+    
+    //         current = current.plusMonths(1);
+    //     }
+    
+    //     return generatedSlips;
+    // }
 
     private Double getLastSalaryBase(String employee) throws Exception {
         String cookie = loginService.getSessionCookie();
@@ -728,8 +863,35 @@ public class SalaryStructAssService {
         return matchingResults;
     }
 
-
-
+    public BigDecimal getMoyenneTotalBaseOfAllEmployees() throws Exception {
+        String cookie = loginService.getSessionCookie();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.add(HttpHeaders.COOKIE, cookie);
+    
+        String url = baseUrl + "/api/resource/Salary Structure Assignment?fields=[\"base\"]"
+                + "&filters=[[\"Salary Structure Assignment\",\"docstatus\",\"=\",1]]"
+                + "&limit_page_length=1000"; 
+    
+        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), String.class);
+    
+        if (!response.getStatusCode().is2xxSuccessful()) {
+            throw new Exception("Erreur lors de la récupération des bases : " + response.getBody());
+        }
+    
+        BigDecimal total = BigDecimal.ZERO;
+        var array = objectMapper.readTree(response.getBody()).path("data");
+    
+        int i = 0;
+        for (JsonNode node : array) {
+            BigDecimal base = node.has("base") ? new BigDecimal(node.get("base").asDouble()) : BigDecimal.ZERO;
+            total = total.add(base);
+            i++;
+        }
+    
+        return total.divide(new BigDecimal(i));
+    }
+    
 
     /**
      * Récupère le nom du Salary Structure Assignment pour un employé à une date donnée.
@@ -775,8 +937,6 @@ public class SalaryStructAssService {
             throw new RuntimeException("Aucun Salary Structure Assignment trouvé pour l'employé à cette date.");
         }
     }
-
-
 
 
    /**
@@ -857,6 +1017,32 @@ public class SalaryStructAssService {
 
         System.out.println("=== APPLY MODIFICATION DONE ===");
     }
+
+    public String getAssignmentNameBySalaryStructure(String salaryStructure) throws Exception {
+        String cookie = loginService.getSessionCookie();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.add(HttpHeaders.COOKIE, cookie);
+    
+        String url = baseUrl + "/api/resource/Salary Structure Assignment?fields=[\"name\"]"
+                + "&filters=[[\"Salary Structure Assignment\",\"salary_structure\",\"=\",\"" + salaryStructure + "\"]]"
+                + "&order_by=creation desc&limit=1";
+    
+        ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), String.class);
+    
+        if (!response.getStatusCode().is2xxSuccessful()) {
+            throw new Exception("Erreur lors de la récupération : " + response.getBody());
+        }
+    
+        JsonNode dataArray = objectMapper.readTree(response.getBody()).path("data");
+    
+        if (dataArray.isArray() && dataArray.size() > 0) {
+            return dataArray.get(0).path("name").asText();
+        }
+    
+        throw new Exception("Aucun Salary Structure Assignment trouvé pour le Salary Structure : " + salaryStructure);
+    }
+    
 
 
 }

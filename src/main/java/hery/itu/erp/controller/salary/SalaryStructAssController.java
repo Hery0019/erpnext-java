@@ -1,16 +1,12 @@
 package hery.itu.erp.controller.salary;
 
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseBody;
 
 import hery.itu.erp.model.rh.Employee;
 import hery.itu.erp.model.salary.SalaryStructAss;
@@ -18,12 +14,8 @@ import hery.itu.erp.service.salary.SalaryStructAssService;
 import hery.itu.erp.service.rh.EmployeeService;
 import hery.itu.erp.service.util.StringConvertService;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.Map;
 import java.util.List;
 
 
@@ -102,6 +94,8 @@ public class SalaryStructAssController {
         @RequestParam String posting_date,
         @RequestParam(required = false) String base,  // peut être null ou vide
         @RequestParam String currency,
+        @RequestParam(required = false) String ecraser,  // peut être null ou vide
+        @RequestParam(required = false) String moyenne,  // peut être null ou vide
         Model model
     ) throws Exception {
 
@@ -112,6 +106,7 @@ public class SalaryStructAssController {
 
         // 🔑 Construire SalaryStructAss de base
         SalaryStructAss salaryStructAss = new SalaryStructAss();
+        salaryStructAss.setName("Salary Structure Assignment " + employee);
         salaryStructAss.setEmployee(employee);
         salaryStructAss.setSalary_structure(salary_structure);
         salaryStructAss.setCompany(company);
@@ -127,7 +122,7 @@ public class SalaryStructAssController {
         LocalDate start = LocalDate.parse(from_date);
         LocalDate end = LocalDate.parse(to_date);
 
-        var slips = salaryStructAssService.generateSalary(salaryStructAss, start, end);
+        var slips = salaryStructAssService.generateSalary(salaryStructAss, start, end, ecraser, moyenne);
 
         model.addAttribute("success",
             "Salary Slips générés : " + slips.size() + " slips créés de " + from_date + " à " + to_date

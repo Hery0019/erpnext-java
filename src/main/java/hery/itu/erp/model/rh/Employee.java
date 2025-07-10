@@ -1,5 +1,6 @@
 package hery.itu.erp.model.rh;
 
+
 public class Employee {
     private String name;
     private String first_name;
