@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Détails de la Facture</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary sticky-top">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="/">ERPNext</a>
+        <div class="collapse navbar-collapse">
+            <ul class="navbar-nav ms-auto">
+                <li class="nav-item"><a class="nav-link" href="/fournisseurs">Fournisseur</a></li>
+                <li class="nav-item"><a class="nav-link" href="/factures">Factures</a></li>
+                <li class="nav-item"><a class="nav-link" href="/">Déconnexion</a></li>
+            </ul>
+            </ul>
+        </div>
+    </div>
+</nav>
+<div class="container py-5">
+    <h2 class="mb-4 text-center">Détails de la Facture</h2>
+    <div th:if="${detailsFactures != null}">
+        <div class="card mb-4 shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title">Facture <span class="badge bg-primary" th:text="${detailsFactures.facture.name}"></span></h5>
+                <a class="btn btn-outline-danger btn-sm mb-2" th:href="@{'/factures/' + ${detailsFactures.facture.name} + '/pdf'}" target="_blank">
+                    <i class="bi bi-file-earmark-pdf"></i> Télécharger en PDF
+                </a>
+                <div class="row mb-2">
+                    <div class="col-md-6"><strong>Fournisseur :</strong> <span th:text="${detailsFactures.facture.supplierName}"></span></div>
+                    <div class="col-md-6"><strong>Date :</strong> <span th:text="${detailsFactures.facture.postingDate}"></span></div>
+                </div>
+                <div class="row mb-2">
+                    <div class="col-md-6"><strong>Status :</strong> <span th:text="${detailsFactures.facture.status}"></span></div>
+                    <div class="col-md-6"><strong>Montant restant :</strong> <span th:text="${detailsFactures.facture.outstandingAmount}"></span></div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6"><strong>Grand Total :</strong> <span th:text="${detailsFactures.grandTotal}"></span></div>
+                </div>
+            </div>
+        </div>
+
+        <h4>Articles</h4>
+        <table class="table table-bordered">
+            <thead class="table-light">
+                <tr>
+                    <th>Code</th>
+                    <th>Nom</th>
+                    <th>Quantité</th>
+                    <th>Prix Unitaire</th>
+                    <th>Montant</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="item : ${detailsFactures.items}">
+                    <td th:text="${item.item_code}"></td>
+                    <td th:text="${item.item_name}"></td>
+                    <td th:text="${item.qty}"></td>
+                    <td th:text="${item.rate}"></td>
+                    <td th:text="${item.amount}"></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- Formulaire de paiement -->
+        <div th:if="${detailsFactures.facture.outstandingAmount > 0}">
+            <h4>Payer la facture</h4>
+            <form th:action="@{'/factures/' + ${detailsFactures.facture.name} + '/payer'}" method="post" class="row g-3 align-items-center">
+                <div class="col-auto">
+                    <label for="amount" class="col-form-label">Montant à payer :</label>
+                </div>
+                <div class="col-auto">
+                    <input type="number" step="0.01" min="1" th:max="${detailsFactures.facture.outstandingAmount}" id="amount" name="amount" class="form-control" required>
+                </div>
+                <div class="col-auto">
+                    <button type="submit" class="btn btn-success">Payer</button>
+                </div>
+            </form>
+            <p class="text-muted mt-2">Montant dû : <span th:text="${detailsFactures.facture.outstandingAmount}"></span></p>
+        </div>
+    </div>
+    <div th:if="${detailsFactures == null}">
+        <div class="alert alert-danger">Aucune donnée disponible pour cette facture.</div>
+    </div>
+</div>
+</body>
+</html>

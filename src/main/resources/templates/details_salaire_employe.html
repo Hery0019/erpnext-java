@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Détails des salaires par employé</title>
+    <meta charset="UTF-8">
+</head>
+<body>
+
+<h1>Détails des salaires pour [[${mois}]] / [[${annee}]]</h1>
+
+<a th:href="@{/total/salaires/annee}">← Retour à la vue mensuelle</a>
+
+<table border="1">
+    <thead>
+        <tr>
+            <th>Mois</th>
+            <th>Année</th>
+            <th>Brut</th>
+            <th>Déduction</th>
+            <th>Net</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr th:each="entry : ${totauxParMois}">
+            <td th:text="${entry.value.moisNum}"></td>
+            <td th:text="${entry.value.anneeNum}"></td>
+            <td th:text="${entry.value.brut}"></td>
+            <td th:text="${entry.value.deduction}"></td>
+            <td th:text="${entry.value.net}"></td>
+        </tr>
+    </tbody>
+</table>
+
+</body>
+</html>

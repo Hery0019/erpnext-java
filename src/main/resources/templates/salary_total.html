@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Total des Salaires</title>
+    <meta charset="UTF-8">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            background-color: #f4f7fa;
+            color: #333;
+        }
+
+        nav {
+            background-color: #2c3e50;
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+        }
+
+        nav .logo {
+            font-size: 1.3em;
+            font-weight: bold;
+        }
+
+        nav a {
+            color: white;
+            text-decoration: none;
+            margin-left: 20px;
+            font-weight: 500;
+        }
+
+        nav a:hover {
+            text-decoration: underline;
+        }
+
+        main {
+            padding: 40px;
+        }
+
+        h1, h4 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+
+        form {
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+            margin-bottom: 30px;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            min-width: 180px;
+        }
+
+        form label {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        form input, form select {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        button {
+            background-color: #2980b9;
+            color: white;
+            padding: 10px 18px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        button:hover {
+            background-color: #216998;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 12px 16px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #2980b9;
+            color: white;
+            font-weight: 600;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f9fbfd;
+        }
+
+        tr:hover {
+            background-color: #f1f9ff;
+        }
+
+        ul {
+            padding-left: 1rem;
+            margin: 0;
+        }
+
+        .empty-message {
+            background-color: #fff3cd;
+            color: #856404;
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 20px;
+            border: 1px solid #ffeeba;
+        }
+
+        /* Style général pour tous les boutons de type lien */
+        a.button {
+            display: inline-block;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        /* Style spécifique pour "+ New Salary Struct Ass" */
+        a[href="/salary-struct-ass"] {
+            background-color: #2980b9; /* Bleu ERPNext */
+            color: white;
+            border: 1px solid #1a6aa1;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Effet au survol */
+        a[href="/salary-struct-ass"]:hover {
+            background-color: #1a6aa1; /* Bleu plus foncé */
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Style pour le texte (amélioration de la lisibilité) */
+        a[href="/salary-struct-ass"] {
+            font-size: 14px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase; /* Optionnel : "NEW SALARY STRUCT ASS" en majuscules */
+        }
+    </style>
+</head>
+<body>
+
+<nav>
+    <div class="logo">ERPNext</div>
+    <div>
+        <a href="/import">Import</a>
+        <a href="/employes">Employee</a>
+        <a href="/salary-struct-ass/list">Salary Structure Assignments</a>
+        <a href="/salaries">Salary Register</a>
+        <a href="/salary-total/show">Salary Total</a>
+        <a href="/modification-groupe/show">Modification Groupe</a>
+        <a href="/">Logout</a>
+    </div>
+</nav>
+
+<main>
+    
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h1>Total des Salaires (Regroupés par Mois)</h1>
+        <a href="/salary-struct-ass/new" class="button" style="background-color:#2980b9;">+ New Salary Struct Ass</a>
+    </div>
+
+    <form method="get" action="/salary-total/show">
+        <div class="form-group">
+            <label for="year">Année</label>
+            <input type="number" name="year" id="year" min="2000" max="2100" th:value="${selectedYear}" />
+        </div>
+        <div class="form-group" style="align-self: flex-end;">
+            <button type="submit">Filtrer</button>
+        </div>
+    </form>
+
+    <div th:if="${groupedSalaries != null and !groupedSalaries.isEmpty()}">
+        <table>
+            <thead>
+                <tr>
+                    <th>Mois</th>
+                    <th>Gains (Earnings)</th>
+                    <th>Déductions</th>
+                    <th>Total Net</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="group : ${groupedSalaries}">
+                    <td>
+                        <a th:href="@{'/salary-total/month-detail'(year=${#strings.substring(group.month, 0, 4)}, month=${#strings.substring(group.month, 5, 7)})}"
+                           th:text="${group.month}"></a>
+                    </td>
+                    
+                    <td>
+                        <ul>
+                            <li th:each="entry : ${group.earningsTotal}">
+                                <span th:text="${entry.key} + ' : '"></span>
+                                <strong th:text="${#numbers.formatDecimal(entry.value, 1, 'POINT', 2, 'NONE')}"></strong>
+                            </li>
+                        </ul>
+                    </td>
+                    <td>
+                        <ul>
+                            <li th:each="entry : ${group.deductionsTotal}">
+                                <span th:text="${entry.key} + ' : '"></span>
+                                <strong th:text="${#numbers.formatDecimal(entry.value, 1, 'POINT', 2, 'NONE')}"></strong>
+                            </li>
+                        </ul>
+                    </td>
+                    <td><strong th:text="${#numbers.formatDecimal(group.totalNet, 1, 'POINT', 2, 'NONE')}"></strong></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div th:if="${groupedSalaries == null or groupedSalaries.isEmpty()}" class="empty-message">
+        Aucune donnée de salaire trouvée pour l'année sélectionnée.
+    </div>
+
+    <div th:if="${groupedSalaries != null and !groupedSalaries.isEmpty()}" style="margin-top: 40px;">
+        <h4>Graphiques mensuels</h4>
+        <div style="display: flex; flex-wrap: wrap; gap: 20px;">
+            <div style="flex: 1; min-width: 300px;">
+                <h6 class="text-center">Total Net</h6>
+                <canvas id="netPayChart"></canvas>
+            </div>
+            <div style="flex: 1; min-width: 300px;">
+                <h6 class="text-center">Earnings</h6>
+                <canvas id="earningsChart"></canvas>
+            </div>
+            <div style="flex: 1; min-width: 300px;">
+                <h6 class="text-center">Déductions</h6>
+                <canvas id="deductionsChart"></canvas>
+            </div>
+        </div>
+    </div>
+</main>
+
+<!-- Chart.js -->
+<script th:inline="javascript">
+    /*<![CDATA[*/
+    const data = /*[[${groupedSalaries}]]*/ [];
+
+    const months = data.map(g => g.month);
+    const netPay = data.map(g => parseFloat(g.totalNet));
+
+    const earningsComponents = {};
+    const deductionsComponents = {};
+
+    data.forEach(g => {
+        for (const [key, value] of Object.entries(g.earningsTotal)) {
+            if (!earningsComponents[key]) earningsComponents[key] = [];
+            earningsComponents[key].push(parseFloat(value));
+        }
+        for (const [key, value] of Object.entries(g.deductionsTotal)) {
+            if (!deductionsComponents[key]) deductionsComponents[key] = [];
+            deductionsComponents[key].push(parseFloat(value));
+        }
+    });
+
+    new Chart(document.getElementById('netPayChart'), {
+        type: 'line',
+        data: {
+            labels: months,
+            datasets: [{
+                label: 'Total Net',
+                data: netPay,
+                borderColor: 'green',
+                backgroundColor: 'rgba(0, 128, 0, 0.2)',
+                tension: 0.3,
+                fill: true
+            }]
+        },
+        options: { responsive: true }
+    });
+
+    new Chart(document.getElementById('earningsChart'), {
+        type: 'line',
+        data: {
+            labels: months,
+            datasets: Object.entries(earningsComponents).map(([key, values], index) => ({
+                label: key,
+                data: values,
+                borderColor: `hsl(${index * 50}, 70%, 50%)`,
+                tension: 0.3,
+                fill: false
+            }))
+        },
+        options: { responsive: true }
+    });
+
+    new Chart(document.getElementById('deductionsChart'), {
+        type: 'line',
+        data: {
+            labels: months,
+            datasets: Object.entries(deductionsComponents).map(([key, values], index) => ({
+                label: key,
+                data: values,
+                borderColor: `hsl(${(index + 1) * 60}, 70%, 50%)`,
+                tension: 0.3,
+                fill: false
+            }))
+        },
+        options: { responsive: true }
+    });
+    /*]]>*/
+</script>
+
+</body>
+</html>

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Accueil</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary sticky-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">ERPNext</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item"><a class="nav-link" href="/fournisseurs">Fournisseur</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/factures">Factures</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/">Déconnexion</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <div classs="container py-5">
+        <div class="card shadow-sm">
+                <h2 class="h5 mb-0">Liste des Fournisseurs</h2>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Nom</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr th:each="fournisseur : ${fournisseurs}">
+                                <td th:text="${fournisseur.name}">Nom</td>
+                                <td>
+                                    <a th:href="@{'/fournisseurs/' + ${fournisseur.name} + '/devis'}" class="btn btn-outline-secondary btn-sm me-2">Voir devis</a>
+                                    <a th:href="@{'/fournisseur/commandes?nom=' + ${fournisseur.name}}" class="btn btn-outline-info btn-sm">Voir commandes</a>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

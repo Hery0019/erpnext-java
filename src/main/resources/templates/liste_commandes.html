@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Liste des commandes</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+
+    <meta charset="UTF-8">
+    <title>Commandes du fournisseur</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary sticky-top">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="/">ERPNext</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav ms-auto">
+                <li class="nav-item"><a class="nav-link" href="/fournisseurs">Fournisseur</a></li>
+                <li class="nav-item"><a class="nav-link" href="/factures">Factures</a></li>
+                <li class="nav-item"><a class="nav-link" href="/">Déconnexion</a></li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<div class="container py-5">
+
+<h2>Commandes pour <span th:text="${nomFournisseur}"></span></h2>
+
+<form method="get" th:action="@{/fournisseur/commandes}" class="row g-3 align-items-center mb-4">
+    <input type="hidden" name="nom" th:value="${nomFournisseur}" />
+    <div class="col-auto">
+        <label for="statut" class="col-form-label">Filtrer par statut :</label>
+    </div>
+    <div class="col-auto">
+        <select id="statut" name="statut" class="form-select">
+            <option value="recu" th:selected="${statutFiltre == 'recu'}">Reçu</option>
+            <option value="paye" th:selected="${statutFiltre == 'paye'}">Payé</option>
+        </select>
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-outline-primary">Filtrer</button>
+    </div>
+</form>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover align-middle">
+                <thead class="table-primary">
+                    <tr>
+                        <th>Numéro</th>
+                        <th>Titre</th>
+                        <th>Statut</th>
+                        <th>Devise</th>
+                        <th>Montant</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="cmd : ${commandes}">
+                        <td th:text="${cmd.numero}"></td>
+                        <td th:text="${cmd.titre}"></td>
+                        <td>
+                            <span th:text="${cmd.status}" th:classappend="'badge ' + 
+                                (${cmd.status} == 'Payé' ? 'bg-success' : 
+                                (${cmd.status} == 'Reçu' ? 'bg-warning text-dark' : 'bg-secondary'))"></span>
+                        </td>
+                        <td th:text="${cmd.currency}"></td>
+                        <td th:text="${cmd.montant}"></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+</div>
+</body>
+</html>
