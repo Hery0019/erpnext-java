@@ -8,7 +8,6 @@ public class HomeController {
 
     @GetMapping("/")
     public String showLoginPage() {
-        System.out.println("hello");
         return "login"; // This should match the name of your HTML file without the extension
     }
 }
