@@ -1,9 +1,7 @@
 package hery.itu.erp.controller.facture;
 
 import java.util.List;
-import java.util.Map;
 
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -11,6 +9,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import hery.itu.erp.erpnext.ErpNextException;
 import hery.itu.erp.model.DetailsFacture;
@@ -48,13 +47,22 @@ public class FactureAchatController {
         return "details_facture";
     }
 
+    /** Formulaire HTML : le résultat est affiché sur la page de détail (message flash). */
     @PostMapping("/{factureNom}/payer")
-    public ResponseEntity<Map<String, String>> payerFacture(@PathVariable String factureNom, @RequestParam double amount) {
-        try {
-            factureAchatService.payerFacture(factureNom, amount);
-            return ResponseEntity.ok(Map.of("message", "Paiement effectué avec succès"));
-        } catch (ErpNextException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Erreur lors du paiement : " + e.getErpNextMessage()));
+    public String payerFacture(@PathVariable String factureNom, @RequestParam double amount,
+                               RedirectAttributes redirectAttributes) {
+        if (amount <= 0) {
+            redirectAttributes.addFlashAttribute("error", "Le montant à payer doit être positif.");
+        } else {
+            try {
+                factureAchatService.payerFacture(factureNom, amount);
+                redirectAttributes.addFlashAttribute("success",
+                        "Paiement de " + amount + " enregistré et soumis pour la facture " + factureNom + ".");
+            } catch (ErpNextException e) {
+                redirectAttributes.addFlashAttribute("error", "Paiement refusé par ERPNext : " + e.getErpNextMessage());
+            }
         }
+        redirectAttributes.addAttribute("name", factureNom);
+        return "redirect:/factures/{name}/detailsFacture";
     }
 }

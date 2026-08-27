@@ -64,6 +64,8 @@
             </tbody>
         </table>
 
+        <div class="alert alert-success" role="alert" th:if="${success}" th:text="${success}"></div>
+        <div class="alert alert-danger" role="alert" th:if="${error}" th:text="${error}"></div>
         <!-- Formulaire de paiement -->
         <div th:if="${detailsFactures.facture.outstandingAmount > 0}">
             <h4>Payer la facture</h4>
