@@ -23,6 +23,7 @@
             Identifiants invalides
         </div>
         <div class="alert alert-info" role="alert" th:if="${param.logout}">Vous êtes déconnecté.</div>
+        <div class="alert alert-warning" role="alert" th:if="${param.expired}">Votre session ERPNext a expiré, veuillez vous reconnecter.</div>
 
         <form th:action="@{/login}" method="post">
             <div class="mb-3">
