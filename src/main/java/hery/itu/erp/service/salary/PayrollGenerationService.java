@@ -113,7 +113,9 @@ public class PayrollGenerationService {
             return template.getBase();
         }
         if (useAverage) {
-            return assignments.getMoyenneTotalBaseOfAllEmployees();
+            return assignments.getMoyenneTotalBaseOfAllEmployees()
+                    .orElseThrow(() -> new IllegalStateException(
+                            "Moyenne impossible : aucune assignation salariale soumise dans ERPNext"));
         }
         return assignments.getLastSalaryBase(template.getEmployee())
                 .orElseThrow(() -> new IllegalStateException(

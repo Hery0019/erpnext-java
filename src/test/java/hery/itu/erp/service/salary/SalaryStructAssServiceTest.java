@@ -198,6 +198,41 @@ class SalaryStructAssServiceTest {
         server.verify();
     }
 
+    @Test
+    void laMoyenneDesBasesEstArrondieEtSupporteUnQuotientNonFini() {
+        server.expect(requestTo(Matchers.startsWith(SSA_URL + "?")))
+                .andExpect(request -> assertThat(request.getURI().getQuery()).contains("[[\"docstatus\",\"=\",1]]"))
+                .andRespond(withSuccess("{\"data\":[{\"base\":1000000},{\"base\":1000000},{\"base\":1000001}]}", JSON));
+
+        assertThat(service.getMoyenneTotalBaseOfAllEmployees()).contains(new BigDecimal("1000000.33"));
+    }
+
+    @Test
+    void laMoyenneSansAssignationSoumiseEstVide() {
+        server.expect(requestTo(Matchers.startsWith(SSA_URL + "?")))
+                .andRespond(withSuccess("{\"data\":[]}", JSON));
+
+        assertThat(service.getMoyenneTotalBaseOfAllEmployees()).isEmpty();
+    }
+
+    @Test
+    void laListeDesSsaInterrogeLeBonDocTypeEtIgnoreLesAnnules() {
+        server.expect(requestTo(Matchers.startsWith(SSA_URL + "?")))
+                .andExpect(request -> assertThat(request.getURI().getQuery())
+                        .contains("fields=[\"name\",\"employee\",\"employee_name\",\"salary_structure\",\"company\",\"currency\",\"base\",\"from_date\",\"to_date\",\"docstatus\"]")
+                        .contains("filters=[[\"docstatus\",\"in\",[0,1]]]"))
+                .andRespond(withSuccess("{\"data\":[{\"name\":\"HR-SSA-2025-00002\",\"employee\":\"HR-EMP-00001\","
+                        + "\"employee_name\":\"Ana Bé\",\"salary_structure\":\"Standard\",\"base\":1500,\"from_date\":\"2025-03-01\",\"docstatus\":1}]}", JSON));
+
+        List<SalaryStructAss> all = service.getAllSalaryStructureAssignments();
+
+        assertThat(all).hasSize(1);
+        assertThat(all.get(0).getName()).isEqualTo("HR-SSA-2025-00002");
+        assertThat(all.get(0).getEmployee_name()).isEqualTo("Ana Bé");
+        assertThat(all.get(0).getBase()).isEqualByComparingTo("1500");
+        assertThat(all.get(0).getFrom_date()).isEqualTo("2025-03-01");
+    }
+
     private static SalaryStructAss assignment(String employee, String from, String to, String base) {
         SalaryStructAss ass = new SalaryStructAss();
         ass.setEmployee(employee);

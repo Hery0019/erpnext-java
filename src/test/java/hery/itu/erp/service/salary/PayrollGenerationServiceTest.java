@@ -110,6 +110,32 @@ class PayrollGenerationServiceTest {
     }
 
     @Test
+    void baseAbsenteAvecMoyenneUtiliseLaMoyenneDesBasesSoumises() {
+        when(assignments.getMoyenneTotalBaseOfAllEmployees()).thenReturn(Optional.of(new BigDecimal("1500.33")));
+        when(assignments.salarySlipExists(EMP, "2025-03-01", "2025-03-31")).thenReturn(false);
+        when(assignments.findAssignmentName(EMP, "2025-03-01")).thenReturn(Optional.empty());
+        when(assignments.createAssignmentAndSlip(any()))
+                .thenReturn(new AssignmentAndSlips("HR-SSA-2025-00052", List.of("Sal Slip/HR-EMP-00001/00012")));
+
+        service.generate(template(null), MARS_1, MARS_31, false, true);
+
+        ArgumentCaptor<SalaryStructAss> captor = ArgumentCaptor.forClass(SalaryStructAss.class);
+        verify(assignments).createAssignmentAndSlip(captor.capture());
+        assertThat(captor.getValue().getBase()).isEqualByComparingTo("1500.33");
+        verify(assignments, never()).getLastSalaryBase(any());
+    }
+
+    @Test
+    void moyenneSansAssignationSoumiseEchoueAvantToutAppelErpNext() {
+        when(assignments.getMoyenneTotalBaseOfAllEmployees()).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.generate(template(null), MARS_1, MARS_31, false, true))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Moyenne impossible");
+        verify(assignments, never()).createAssignmentAndSlip(any());
+    }
+
+    @Test
     void baseAbsenteSansHistoriqueEchoueAvantToutAppelErpNext() {
         when(assignments.getLastSalaryBase(EMP)).thenReturn(Optional.empty());
 

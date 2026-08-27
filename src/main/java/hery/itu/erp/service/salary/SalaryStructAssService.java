@@ -1,6 +1,7 @@
 package hery.itu.erp.service.salary;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -27,7 +28,6 @@ import hery.itu.erp.model.salary.SalaryStructAss;
  * <p>
  * La génération sur période (aléa 1) est dans {@link PayrollGenerationService}, la
  * modification groupée (aléa 2) dans {@link BulkSalaryAdjustmentService}.
- * Restent à corriger (commits séparés) : points 1.4 et 1.5 de la revue.
  */
 @Service
 public class SalaryStructAssService {
@@ -200,24 +200,16 @@ public class SalaryStructAssService {
         return client.getDoc(SALARY_STRUCTURE_ASSIGNMENT, id, SalaryStructAss.class);
     }
 
+    /** Tous les SSA actifs (brouillons et soumis), du plus récent au plus ancien. */
     public List<SalaryStructAss> getAllSalaryStructureAssignments() {
-        // NB : interroge Salary Slip et non Salary Structure Assignment (point 1.4, corrigé séparément)
-        List<JsonNode> rows = client.list(SALARY_SLIP)
-                .fields("name", "employee", "posting_date", "salary_structure_assignment", "earnings", "deductions")
-                .fetchAll();
-        List<SalaryStructAss> assignments = new ArrayList<>();
-        for (JsonNode row : rows) {
-            SalaryStructAss ass = new SalaryStructAss();
-            ass.setName(row.path("name").asText());
-            ass.setEmployee(row.path("employee_name").asText());
-            ass.setSalary_structure(row.path("salary_structure").asText());
-            ass.setCompany(row.path("company").asText());
-            ass.setCurrency(row.path("currency").asText());
-            ass.setBase(row.path("base").decimalValue());
-            ass.setFrom_date(row.path("from_date").asText());
-            assignments.add(ass);
-        }
-        return assignments;
+        return client.list(SALARY_STRUCTURE_ASSIGNMENT)
+                .fields("name", "employee", "employee_name", "salary_structure", "company", "currency",
+                        "base", "from_date", "to_date", "docstatus")
+                .filters(Filters.where("docstatus", "in", DOCSTATUS_ACTIF))
+                .orderBy("from_date desc, employee_name asc")
+                .fetchAll().stream()
+                .map(node -> client.convert(node, SalaryStructAss.class))
+                .toList();
     }
 
     // ------------------------------------------------------------- workflow doc
@@ -372,20 +364,20 @@ public class SalaryStructAssService {
         return matchingResults;
     }
 
-    public BigDecimal getMoyenneTotalBaseOfAllEmployees() {
+    /** Moyenne (2 décimales) des bases de tous les SSA soumis ; vide s'il n'y en a aucun. */
+    public Optional<BigDecimal> getMoyenneTotalBaseOfAllEmployees() {
         List<JsonNode> rows = client.list(SALARY_STRUCTURE_ASSIGNMENT)
                 .fields("base")
                 .filters(Filters.where("docstatus", "=", SUBMITTED))
                 .fetchAll();
-
+        if (rows.isEmpty()) {
+            return Optional.empty();
+        }
         BigDecimal total = BigDecimal.ZERO;
-        int count = 0;
         for (JsonNode node : rows) {
             total = total.add(node.path("base").decimalValue());
-            count++;
         }
-        // NB : division sans échelle ni garde sur count == 0 (point 1.5, corrigé séparément)
-        return total.divide(new BigDecimal(count));
+        return Optional.of(total.divide(BigDecimal.valueOf(rows.size()), 2, RoundingMode.HALF_UP));
     }
 
     /** Nom du SSA actif pour l'employé à la date du slip (le plus récent dont from_date &lt;= posting_date). */
