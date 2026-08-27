@@ -1,58 +1,55 @@
 package hery.itu.erp.service.fourniseur;
 
-import hery.itu.erp.model.PurchaseOrder;
-import hery.itu.erp.service.login.LoginService;
+import java.util.List;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.*;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 
-import java.util.*;
+import com.fasterxml.jackson.databind.JsonNode;
+
+import hery.itu.erp.erpnext.ErpNextClient;
+import hery.itu.erp.erpnext.Filters;
+import hery.itu.erp.model.PurchaseOrder;
 
 @Service
 public class PurchaseOrderService {
 
-    @Autowired
-    private LoginService loginService;
+    private static final String PURCHASE_ORDER = "Purchase Order";
+    private static final List<String> STATUTS_RECU = List.of("To Receive and Bill", "To Receive", "Completed", "Delivered", "Draft");
+    private static final List<String> STATUTS_PAYE = List.of("To Bill", "Completed", "Closed");
 
+    private final ErpNextClient client;
 
-    private RestTemplate restTemplate =  new RestTemplate();;
+    public PurchaseOrderService(ErpNextClient client) {
+        this.client = client;
+    }
 
+    /**
+     * @param statut {@code recu}, {@code paye} ou vide/null pour tous
+     */
     public List<PurchaseOrder> getCommandesParFournisseur(String fournisseurNom, String statut) {
-        String baseUrl = "http://erpnext.localhost:8000/api/resource/Purchase Order";
-        String fields = "[\"name\",\"title\",\"status\",\"currency\",\"grand_total\"]";
-        String filters = "[[\"supplier\",\"=\",\"" + fournisseurNom + "\"]";
-
-        if (statut != null && !statut.isEmpty()) {
-            if (statut.equals("recu")) {
-                filters += ",[\"status\",\"in\",[\"To Receive and Bill\",\"To Receive\",\"Completed\",\"Delivered\",\"Draft\"]]";
-            } else if (statut.equals("paye")) {
-                filters += ",[\"status\",\"in\",[\"To Bill\",\"Completed\",\"Closed\"]]";
-            }
-        }
-        filters += "]";
-
-        String url = baseUrl + "?fields=" + fields + "&filters=" + filters;
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Cookie", loginService.getSessionCookie());
-        HttpEntity<String> entity = new HttpEntity<>(headers);
-
-        ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
-        List<Map<String, Object>> data = (List<Map<String, Object>>) response.getBody().get("data");
-
-        List<PurchaseOrder> commandes = new ArrayList<>();
-        for (Map<String, Object> poData : data) {
-            PurchaseOrder po = new PurchaseOrder();
-            po.setNumero((String) poData.get("name"));
-            po.setTitre((String) poData.get("title"));
-            po.setStatus((String) poData.get("status"));
-            po.setCurrency((String) poData.get("currency"));
-            po.setMontant((Double) poData.get("grand_total"));
-            commandes.add(po);
+        Filters filters = Filters.where("supplier", "=", fournisseurNom);
+        if ("recu".equals(statut)) {
+            filters.in("status", STATUTS_RECU);
+        } else if ("paye".equals(statut)) {
+            filters.in("status", STATUTS_PAYE);
         }
 
-        return commandes;
+        return client.list(PURCHASE_ORDER)
+                .fields("name", "title", "status", "currency", "grand_total")
+                .filters(filters)
+                .orderBy("transaction_date desc")
+                .fetchAll().stream()
+                .map(PurchaseOrderService::toPurchaseOrder)
+                .toList();
+    }
+
+    private static PurchaseOrder toPurchaseOrder(JsonNode node) {
+        PurchaseOrder po = new PurchaseOrder();
+        po.setNumero(node.path("name").asText(null));
+        po.setTitre(node.path("title").asText(null));
+        po.setStatus(node.path("status").asText(null));
+        po.setCurrency(node.path("currency").asText(null));
+        po.setMontant(node.path("grand_total").asDouble(0.0));
+        return po;
     }
 }

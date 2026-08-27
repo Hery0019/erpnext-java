@@ -1,56 +1,33 @@
 package hery.itu.erp.service.importation;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Base64;
-import java.util.List;
 
-import org.springframework.core.io.ByteArrayResource;
-import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
-import org.springframework.web.client.RestTemplate;
 
-import java.util.Map;
+import com.fasterxml.jackson.databind.JsonNode;
 
-import hery.itu.erp.service.login.LoginService;
+import hery.itu.erp.erpnext.ErpNextClient;
 
 @Service
 public class ImportService {
 
-    private final RestTemplate restTemplate = new RestTemplate();
-    private final LoginService loginService;
+    /** Méthode whitelistée côté ERPNext : util/salaireImport.py. */
+    private static final String IMPORT_METHOD = "erpnext.api.salaireImport.import_csv_files";
 
-    public ImportService(LoginService loginService) {
-        this.loginService = loginService;
+    private final ErpNextClient client;
+
+    public ImportService(ErpNextClient client) {
+        this.client = client;
     }
 
-
-    public Map importCsvFiles(byte[] file1Bytes, byte[] file2Bytes, byte[] file3Bytes)throws Exception {
-        String url = "http://erpnext.localhost:8000/api/method/erpnext.api.salaireImport.import_csv_files";
-    
-        String content1 = Base64.getEncoder().encodeToString(file1Bytes);
-        String content2 = Base64.getEncoder().encodeToString(file2Bytes);
-        String content3 = Base64.getEncoder().encodeToString(file3Bytes);
-    
+    /** Envoie les trois CSV (base64) à la méthode d'import et renvoie sa réponse brute. */
+    public JsonNode importCsvFiles(byte[] file1Bytes, byte[] file2Bytes, byte[] file3Bytes) {
         MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
-        body.add("file1", content1);
-        body.add("file2", content2);
-        body.add("file3", content3);
-    
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-        headers.set("Cookie", loginService.getSessionCookie());
-    
-        HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
-    
-        ResponseEntity<Map> response = restTemplate.postForEntity(url, request, Map.class);
-    
-        System.out.println("Réponse: " + response.getBody());
-        return response.getBody();
+        body.add("file1", Base64.getEncoder().encodeToString(file1Bytes));
+        body.add("file2", Base64.getEncoder().encodeToString(file2Bytes));
+        body.add("file3", Base64.getEncoder().encodeToString(file3Bytes));
+        return client.callMethodForm(IMPORT_METHOD, body);
     }
-    
-    
 }
-

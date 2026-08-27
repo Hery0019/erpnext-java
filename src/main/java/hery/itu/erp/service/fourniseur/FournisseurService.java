@@ -1,181 +1,133 @@
 package hery.itu.erp.service.fourniseur;
 
-import hery.itu.erp.model.Fournisseur;
-import hery.itu.erp.model.FournisseurResponse;
-import hery.itu.erp.service.login.LoginService;
-
-import org.springframework.http.*;
-import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
-
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
-import hery.itu.erp.model.Devis;
 import java.util.List;
+import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+
+import hery.itu.erp.erpnext.ErpNextClient;
+import hery.itu.erp.erpnext.Filters;
+import hery.itu.erp.model.Devis;
+import hery.itu.erp.model.Fournisseur;
 import hery.itu.erp.model.ItemDevis;
 
 @Service
 public class FournisseurService {
 
-    private final RestTemplate restTemplate = new RestTemplate();
-    private final LoginService loginService;
+    private static final Logger log = LoggerFactory.getLogger(FournisseurService.class);
+    private static final String SUPPLIER = "Supplier";
+    private static final String SUPPLIER_QUOTATION = "Supplier Quotation";
 
-    public FournisseurService(LoginService loginService) {
-        this.loginService = loginService;
+    private final ErpNextClient client;
+
+    public FournisseurService(ErpNextClient client) {
+        this.client = client;
     }
 
     public List<Fournisseur> getFournisseurs() {
-        String url = "http://erpnext.localhost:8000/api/resource/Supplier";
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Cookie", loginService.getSessionCookie()); // Utilise le cookie stocké
-
-        HttpEntity<String> entity = new HttpEntity<>(headers);
-
-        ResponseEntity<FournisseurResponse> response = restTemplate.exchange(
-                url,
-                HttpMethod.GET,
-                entity,
-                FournisseurResponse.class
-        );
-
-        if (response.getStatusCode() == HttpStatus.OK) {
-            return response.getBody().getData();
-        } else {
-            throw new RuntimeException("Erreur appel fournisseur : " + response.getStatusCode());
-        }
+        return client.list(SUPPLIER)
+                .fields("name", "supplier_name", "email_id", "mobile_no")
+                .orderBy("supplier_name asc")
+                .fetchAll().stream()
+                .map(FournisseurService::toFournisseur)
+                .toList();
     }
 
     public List<Devis> getDevisParFournisseur(String fournisseurNom) {
-        String url = "http://erpnext.localhost:8000/api/resource/Supplier Quotation"
-            + "?fields=[\"name\",\"title\",\"status\",\"currency\"]"
-            + "&filters=[[\"supplier\",\"=\",\"" + fournisseurNom + "\"]]";
-    
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Cookie", loginService.getSessionCookie());
-        HttpEntity<String> entity = new HttpEntity<>(headers);
-    
-        ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+        List<JsonNode> quotations = client.list(SUPPLIER_QUOTATION)
+                .fields("name", "title", "status", "currency", "transaction_date")
+                .filters(Filters.where("supplier", "=", fournisseurNom))
+                .orderBy("transaction_date desc")
+                .fetchAll();
+
         List<Devis> devisList = new ArrayList<>();
-        List<Map<String, Object>> data = (List<Map<String, Object>>) response.getBody().get("data");
-    
-        for (Map<String, Object> devisData : data) {
-            String devisName = (String) devisData.get("name");
-    
-            // Appel pour obtenir les détails avec les items
-            String detailsUrl = "http://erpnext.localhost:8000/api/resource/Supplier Quotation/" + devisName;
-            ResponseEntity<Map> detailsResponse = restTemplate.exchange(detailsUrl, HttpMethod.GET, entity, Map.class);
-            Map<String, Object> fullDevisData = (Map<String, Object>) detailsResponse.getBody().get("data");
-    
+        for (JsonNode quotation : quotations) {
+            String devisName = quotation.path("name").asText();
+            // Les items ne sont disponibles que sur le document complet : un appel par devis (voir 3.4 / 5.1).
+            JsonNode full = client.getDoc(SUPPLIER_QUOTATION, devisName);
+
             Devis devis = new Devis();
             devis.setNumero(devisName);
-            devis.setDate((String) devisData.get("title"));
-            devis.setStatus((String) devisData.get("status"));
-            devis.setCurrency((String) devisData.get("currency"));
-    
-            List<Map<String, Object>> items = (List<Map<String, Object>>) fullDevisData.get("items");
-            List<ItemDevis> itemList = new ArrayList<>();
+            devis.setDate(quotation.path("transaction_date").asText(quotation.path("title").asText(null)));
+            devis.setStatus(quotation.path("status").asText(null));
+            devis.setCurrency(quotation.path("currency").asText(null));
+
+            List<ItemDevis> items = new ArrayList<>();
             double total = 0.0;
-    
-            if (items != null) {
-                for (Map<String, Object> item : items) {
-                    ItemDevis itemDevis = new ItemDevis();
-                    itemDevis.setCode((String) item.get("item_code"));
-                    itemDevis.setDevis(devis);
-                    itemDevis.setDescription((String) item.get("description"));
-                    itemDevis.setQuantite(item.get("qty") != null ? ((Number) item.get("qty")).doubleValue() : 0.0);
-                    itemDevis.setUnite((String) item.get("uom"));
-                    itemDevis.setPrixUnitaire(item.get("rate") != null ? ((Number) item.get("rate")).doubleValue() : 0.0);
-                    itemDevis.setMontant(item.get("amount") != null ? ((Number) item.get("amount")).doubleValue() : 0.0);
-                    itemDevis.setEntrepot((String) item.get("warehouse"));
-    
-                    // ✅ Ajout du lien vers le devis
-                    itemDevis.setDevisId(devisName);
-    
-                    total += itemDevis.getMontant();
-                    itemList.add(itemDevis);
-                }
+            for (JsonNode item : full.path("items")) {
+                ItemDevis itemDevis = new ItemDevis();
+                itemDevis.setCode(item.path("item_code").asText(null));
+                itemDevis.setDevis(devis);
+                itemDevis.setDescription(item.path("description").asText(null));
+                itemDevis.setQuantite(item.path("qty").asDouble(0.0));
+                itemDevis.setUnite(item.path("uom").asText(null));
+                itemDevis.setPrixUnitaire(item.path("rate").asDouble(0.0));
+                itemDevis.setMontant(item.path("amount").asDouble(0.0));
+                itemDevis.setEntrepot(item.path("warehouse").asText(null));
+                itemDevis.setDevisId(devisName);
+                total += itemDevis.getMontant();
+                items.add(itemDevis);
             }
-    
             devis.setMontant(total);
-            devis.setItems(itemList);
+            devis.setItems(items);
             devisList.add(devis);
         }
-    
         return devisList;
     }
-    
 
+    /**
+     * Modifie le prix unitaire d'un item du devis puis, si tous les prix sont renseignés,
+     * soumet le devis (comportement historique, voir point 1.10 de la revue).
+     *
+     * @throws IllegalArgumentException si aucun item ne correspond (aucune écriture n'est faite)
+     */
     public void modifierPrixItem(String devisId, String itemCode, double newRate, String entrepot) {
-        try {
-            String url = "http://erpnext.localhost:8000/api/resource/Supplier Quotation/" + devisId;
-    
-            // Préparer les en-têtes
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("Cookie", loginService.getSessionCookie());
-            headers.setContentType(MediaType.APPLICATION_JSON);
-    
-            // 1. Récupérer le devis actuel
-            HttpEntity<String> getEntity = new HttpEntity<>(headers);
-            ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, getEntity, Map.class);
-    
-            if (response.getBody() != null && response.getBody().get("data") != null) {
-                Map<String, Object> data = (Map<String, Object>) response.getBody().get("data");
-                List<Map<String, Object>> items = (List<Map<String, Object>>) data.get("items");
-    
-                // 2. Modifier le prix de l'item spécifique
-                for (Map<String, Object> item : items) {
-                    if (item.get("item_code").equals(itemCode)
-                            && (entrepot == null || entrepot.equals(item.get("warehouse")))) {
-                        item.put("rate", newRate);
-                        double qty = ((Number) item.get("qty")).doubleValue();
-                        item.put("amount", qty * newRate);
-                        break;
-                    }
-                }
-    
-                // 3. Sauvegarder la mise à jour des items
-                Map<String, Object> updateData = new HashMap<>();
-                updateData.put("items", items);
-    
-                HttpEntity<Map<String, Object>> putEntity = new HttpEntity<>(updateData, headers);
-                restTemplate.exchange(url, HttpMethod.PUT, putEntity, Map.class);
-    
-                // 4. Vérifier que tous les rates > 0
-                boolean tousLesRatesValides = items.stream()
-                    .map(i -> ((Number) i.get("rate")).doubleValue())
-                    .allMatch(rate -> rate > 0);
-    
-                // 5. Si tous les prix unitaires sont valides, on soumet le document (docstatus: 1)
-                if (tousLesRatesValides) {
-                    String submitUrl = "http://erpnext.localhost:8000/api/resource/Supplier Quotation/" + devisId;
-                    String requestBody = "{\"docstatus\": 1}";
-                    HttpEntity<String> submitEntity = new HttpEntity<>(requestBody, headers);
-    
-                    ResponseEntity<String> submitResponse = restTemplate.exchange(
-                        submitUrl,
-                        HttpMethod.PUT,
-                        submitEntity,
-                        String.class
-                    );
-    
-                    if (submitResponse.getStatusCode().is2xxSuccessful()) {
-                        System.out.println("Document soumis avec succès !");
-                    } else {
-                        System.out.println("Erreur lors de la soumission : " + submitResponse.getStatusCode());
-                        System.out.println("Réponse : " + submitResponse.getBody());
-                    }
-                } else {
-                    System.out.println("Soumission ignorée : au moins un item a un prix unitaire nul.");
-                }
+        JsonNode data = client.getDoc(SUPPLIER_QUOTATION, devisId);
+        List<Map<String, Object>> items = client.convert(data.path("items"), new TypeReference<List<Map<String, Object>>>() { });
+
+        boolean modifie = false;
+        for (Map<String, Object> item : items) {
+            if (itemCode.equals(item.get("item_code"))
+                    && (entrepot == null || entrepot.equals(item.get("warehouse")))) {
+                double qty = toDouble(item.get("qty"));
+                item.put("rate", newRate);
+                item.put("amount", qty * newRate);
+                modifie = true;
+                break;
             }
-    
-        } catch (Exception e) {
-            System.err.println("Erreur lors de la modification du prix: " + e.getMessage());
-            e.printStackTrace();
-            throw new RuntimeException("Erreur lors de la modification du prix", e);
+        }
+        if (!modifie) {
+            throw new IllegalArgumentException(
+                    "Aucun item " + itemCode + " (entrepôt " + entrepot + ") dans le devis " + devisId);
+        }
+
+        client.update(SUPPLIER_QUOTATION, devisId, Map.of("items", items));
+
+        boolean tousLesRatesValides = items.stream().allMatch(i -> toDouble(i.get("rate")) > 0);
+        if (tousLesRatesValides) {
+            client.update(SUPPLIER_QUOTATION, devisId, Map.of("docstatus", 1));
+            log.info("Devis {} soumis après mise à jour du prix de {}", devisId, itemCode);
+        } else {
+            log.info("Devis {} non soumis : au moins un item a un prix unitaire nul", devisId);
         }
     }
-    
+
+    private static double toDouble(Object value) {
+        return value instanceof Number number ? number.doubleValue() : 0.0;
+    }
+
+    private static Fournisseur toFournisseur(JsonNode node) {
+        Fournisseur f = new Fournisseur();
+        f.setName(node.path("name").asText(null));
+        f.setSupplierName(node.path("supplier_name").asText(null));
+        f.setEmail(node.path("email_id").asText(null));
+        f.setPhone(node.path("mobile_no").asText(null));
+        return f;
+    }
 }

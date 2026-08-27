@@ -1,23 +1,25 @@
 package hery.itu.erp.controller.founisseur;
 
-import org.springframework.http.*;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.mvc.support.RedirectAttributes;
-
-import hery.itu.erp.service.fourniseur.FournisseurService;
-import hery.itu.erp.service.login.LoginService;
-
-import hery.itu.erp.model.Fournisseur;
-import hery.itu.erp.model.FournisseurResponse;
-import org.springframework.stereotype.Controller;   
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseBody;
+
+import hery.itu.erp.erpnext.ErpNextException;
 import hery.itu.erp.model.Devis;
+import hery.itu.erp.model.Fournisseur;
 import hery.itu.erp.model.ItemDevis;
+import hery.itu.erp.service.fourniseur.FournisseurService;
 
 @Controller
 public class FournisseurController {
@@ -40,8 +42,8 @@ public class FournisseurController {
         model.addAttribute("devis", devis);
         model.addAttribute("nomFournisseur", nom);
 
-        // Calculer les totaux par devise
-        java.util.Map<String, Double> totauxParDevise = new java.util.HashMap<>();
+        // Totaux par devise
+        Map<String, Double> totauxParDevise = new HashMap<>();
         for (Devis d : devis) {
             String currency = d.getCurrency();
             if (currency == null) continue;
@@ -50,35 +52,33 @@ public class FournisseurController {
         }
         model.addAttribute("totauxParDevise", totauxParDevise);
 
-        // Préparer la map itemsParDevise
-        java.util.Map<String, java.util.List<ItemDevis>> itemsParDevise = new java.util.HashMap<>();
+        Map<String, List<ItemDevis>> itemsParDevise = new HashMap<>();
         for (Devis d : devis) {
             String currency = d.getCurrency();
-            java.util.List<ItemDevis> items = d.getItems();
+            List<ItemDevis> items = d.getItems();
             if (currency == null || items == null) continue;
-            itemsParDevise.computeIfAbsent(currency, k -> new java.util.ArrayList<>()).addAll(items);
+            itemsParDevise.computeIfAbsent(currency, k -> new ArrayList<>()).addAll(items);
         }
         model.addAttribute("itemsParDevise", itemsParDevise);
 
         return "liste_devis";
     }
 
-
     @PostMapping("/fournisseurs/devis/{devisId}/items/{itemCode}/updatePrice")
     @ResponseBody
     public ResponseEntity<String> updateItemPrice(
             @PathVariable String devisId,
             @PathVariable String itemCode,
-            @RequestParam Double newPrice,
+            @RequestParam double newPrice,
             @RequestParam String entrepot) {
         try {
             fournisseurService.modifierPrixItem(devisId, itemCode, newPrice, entrepot);
             return ResponseEntity.ok("Prix mis à jour avec succès");
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Erreur lors de la mise à jour du prix: " + e.getMessage());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (ErpNextException e) {
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                    .body("Erreur lors de la mise à jour du prix : " + e.getErpNextMessage());
         }
     }
-
-    
 }
