@@ -3,7 +3,9 @@ package hery.itu.erp.service.salary;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -13,8 +15,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import hery.itu.erp.erpnext.ErpNextClient;
+import hery.itu.erp.erpnext.ErpNextForbiddenException;
+import hery.itu.erp.erpnext.ErpNextValidationException;
 import hery.itu.erp.erpnext.Filters;
 import hery.itu.erp.model.salary.SalaryFilterDTO;
 import hery.itu.erp.model.salary.SalaryStructAss;
@@ -35,6 +40,7 @@ public class SalaryStructAssService {
     private static final Logger log = LoggerFactory.getLogger(SalaryStructAssService.class);
     static final String SALARY_STRUCTURE_ASSIGNMENT = "Salary Structure Assignment";
     static final String SALARY_SLIP = "Salary Slip";
+    static final String SALARY_DETAIL = "Salary Detail";
     /** docstatus 0 (brouillon) et 1 (soumis) ; 2 = annulé, à ignorer dans les recherches d'existence. */
     static final List<Integer> DOCSTATUS_ACTIF = List.of(0, 1);
     static final int DRAFT = 0;
@@ -335,33 +341,56 @@ public class SalaryStructAssService {
      */
     public List<SalaryFilterDTO> getSalaryComponentValues(String employee, String salaryComponent,
                                                           String condition, double montant) {
-        List<JsonNode> slips = client.list(SALARY_SLIP)
-                .fields("name")
+        Map<String, SlipPeriod> periods = new LinkedHashMap<>();
+        client.list(SALARY_SLIP)
+                .fields("name", "start_date", "end_date", "posting_date", "docstatus")
                 .filters(Filters.where("employee", "=", employee).in("docstatus", DOCSTATUS_ACTIF))
                 .orderBy("start_date asc")
-                .fetchAll();
+                .fetchAll()
+                .forEach(node -> periods.put(node.path("name").asText(), toSlipPeriod(node)));
+        if (periods.isEmpty()) {
+            return List.of();
+        }
 
         List<SalaryFilterDTO> matchingResults = new ArrayList<>();
-        for (JsonNode slip : slips) {
-            JsonNode details = client.getDoc(SALARY_SLIP, slip.path("name").asText());
-            SlipPeriod period = toSlipPeriod(details);
-
-            for (String table : List.of("earnings", "deductions")) {
-                for (JsonNode line : details.path(table)) {
-                    String component = line.path("salary_component").asText();
-                    if (!salaryComponent.equalsIgnoreCase(component)) {
-                        continue;
-                    }
-                    double amount = line.path("amount").asDouble();
-                    boolean matches = "inf".equals(condition) ? amount < montant : amount > montant;
-                    if (matches) {
-                        matchingResults.add(new SalaryFilterDTO(period.name(), employee, component, amount,
-                                period.postingDate(), period.startDate(), period.endDate(), period.docstatus()));
-                    }
-                }
+        for (JsonNode line : componentLines(periods.keySet(), salaryComponent)) {
+            SlipPeriod period = periods.get(line.path("parent").asText());
+            String component = line.path("salary_component").asText();
+            if (period == null || !salaryComponent.equalsIgnoreCase(component)) {
+                continue;
+            }
+            double amount = line.path("amount").asDouble();
+            boolean matches = "inf".equals(condition) ? amount < montant : amount > montant;
+            if (matches) {
+                matchingResults.add(new SalaryFilterDTO(period.name(), employee, component, amount,
+                        period.postingDate(), period.startDate(), period.endDate(), period.docstatus()));
             }
         }
         return matchingResults;
+    }
+
+    /**
+     * Lignes {@code Salary Detail} du composant pour les fiches données : une requête par lot de fiches,
+     * avec repli sur un GET par fiche si l'instance refuse la lecture directe de la table enfant.
+     */
+    private List<JsonNode> componentLines(Collection<String> slipNames, String salaryComponent) {
+        try {
+            return client.listChildRows(SALARY_DETAIL, SALARY_SLIP, List.of("parent", "salary_component", "amount"),
+                    slipNames, Filters.where("salary_component", "=", salaryComponent), "parent asc, idx asc");
+        } catch (ErpNextValidationException | ErpNextForbiddenException e) {
+            log.warn("Lecture groupée de Salary Detail refusée ({}) : repli sur un appel par fiche", e.getErpNextMessage());
+            List<JsonNode> lines = new ArrayList<>();
+            for (String slipName : slipNames) {
+                JsonNode details = client.getDoc(SALARY_SLIP, slipName);
+                for (String table : List.of("earnings", "deductions")) {
+                    for (JsonNode line : details.path(table)) {
+                        ((ObjectNode) line).put("parent", slipName);
+                        lines.add(line);
+                    }
+                }
+            }
+            return lines;
+        }
     }
 
     /** Moyenne (2 décimales) des bases de tous les SSA soumis ; vide s'il n'y en a aucun. */

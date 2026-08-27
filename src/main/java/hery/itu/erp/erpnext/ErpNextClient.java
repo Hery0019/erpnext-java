@@ -5,7 +5,9 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -53,6 +55,8 @@ public class ErpNextClient {
     private static final Logger log = LoggerFactory.getLogger(ErpNextClient.class);
     /** Garde-fou contre une pagination infinie. */
     private static final int MAX_PAGES = 200;
+    /** Nombre de parents par requête sur une table enfant. */
+    static final int CHILD_BATCH = 100;
 
     private final RestTemplate restTemplate;
     private final ErpNextProperties properties;
@@ -78,6 +82,28 @@ public class ErpNextClient {
     /** Requête de liste sur un DocType ({@code GET /api/resource/{doctype}}). */
     public ListQuery list(String doctype) {
         return new ListQuery(doctype);
+    }
+
+    /**
+     * Lignes d'une table enfant (ex. "Salary Detail") pour un ensemble de documents parents, en une
+     * requête par lot de {@value #CHILD_BATCH} parents (limite de longueur d'URL). Évite un GET par parent.
+     *
+     * @param extraFilters filtres supplémentaires sur la table enfant (peut être null)
+     */
+    public List<JsonNode> listChildRows(String childDoctype, String parentDoctype, List<String> fields,
+                                        Collection<String> parentNames, Filters extraFilters, String orderBy) {
+        List<String> names = new ArrayList<>(new LinkedHashSet<>(parentNames));
+        List<JsonNode> all = new ArrayList<>();
+        for (int i = 0; i < names.size(); i += CHILD_BATCH) {
+            List<String> batch = names.subList(i, Math.min(i + CHILD_BATCH, names.size()));
+            Filters filters = Filters.where("parent", "in", batch);
+            if (extraFilters != null) {
+                extraFilters.asList().forEach(clause ->
+                        filters.and((String) clause.get(0), (String) clause.get(1), clause.get(2)));
+            }
+            all.addAll(list(childDoctype).parent(parentDoctype).fields(fields).filters(filters).orderBy(orderBy).fetchAll());
+        }
+        return all;
     }
 
     /** Document complet ({@code data} de {@code GET /api/resource/{doctype}/{name}}). */
@@ -233,7 +259,7 @@ public class ErpNextClient {
         }
 
         @Override
-        public void handleError(ClientHttpResponse response) {
+        public void handleError(URI url, HttpMethod method, ClientHttpResponse response) {
             // jamais appelé : hasError() renvoie false
         }
     }

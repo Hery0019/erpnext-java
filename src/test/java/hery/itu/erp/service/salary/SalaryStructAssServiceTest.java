@@ -199,6 +199,32 @@ class SalaryStructAssServiceTest {
     }
 
     @Test
+    void lesValeursDUnComposantSontLuesEnUneRequeteSurLaTableEnfant() {
+        server.expect(requestTo(Matchers.startsWith(SLIP_URL + "?")))
+                .andExpect(request -> assertThat(request.getURI().getQuery())
+                        .contains("[[\"employee\",\"=\",\"HR-EMP-00001\"],[\"docstatus\",\"in\",[0,1]]]"))
+                .andRespond(withSuccess("{\"data\":["
+                        + "{\"name\":\"S1\",\"start_date\":\"2025-01-01\",\"end_date\":\"2025-01-31\",\"posting_date\":\"2025-01-31\",\"docstatus\":1},"
+                        + "{\"name\":\"S2\",\"start_date\":\"2025-02-01\",\"end_date\":\"2025-02-28\",\"posting_date\":\"2025-02-28\",\"docstatus\":1}]}", JSON));
+        server.expect(requestTo(Matchers.startsWith("http://erp.test/api/resource/Salary%20Detail?")))
+                .andExpect(request -> assertThat(request.getURI().getQuery())
+                        .contains("[\"parent\",\"in\",[\"S1\",\"S2\"]],[\"salary_component\",\"=\",\"Indemnité\"]")
+                        .contains("parent=Salary Slip"))
+                .andRespond(withSuccess("{\"data\":["
+                        + "{\"parent\":\"S1\",\"salary_component\":\"Indemnité\",\"amount\":50000},"
+                        + "{\"parent\":\"S2\",\"salary_component\":\"Indemnité\",\"amount\":150000}]}", JSON));
+
+        List<SalaryFilterDTO> matches = service.getSalaryComponentValues("HR-EMP-00001", "Indemnité", "inf", 100000);
+
+        assertThat(matches).hasSize(1);
+        assertThat(matches.get(0).getSlipName()).isEqualTo("S1");
+        assertThat(matches.get(0).getStartDate()).isEqualTo("2025-01-01");
+        assertThat(matches.get(0).getEndDate()).isEqualTo("2025-01-31");
+        assertThat(matches.get(0).getDocstatus()).isEqualTo(1);
+        server.verify();
+    }
+
+    @Test
     void laMoyenneDesBasesEstArrondieEtSupporteUnQuotientNonFini() {
         server.expect(requestTo(Matchers.startsWith(SSA_URL + "?")))
                 .andExpect(request -> assertThat(request.getURI().getQuery()).contains("[[\"docstatus\",\"=\",1]]"))

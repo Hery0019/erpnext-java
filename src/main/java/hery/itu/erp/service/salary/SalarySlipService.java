@@ -14,6 +14,9 @@ import hery.itu.erp.model.salary.SalarySlip;
 public class SalarySlipService {
 
     private static final String SALARY_SLIP = "Salary Slip";
+    private static final List<String> FIELDS = List.of(
+            "name", "employee", "employee_name", "start_date", "end_date", "gross_pay", "net_pay",
+            "posting_date", "status", "salary_structure", "company");
 
     private final ErpNextClient client;
 
@@ -23,13 +26,7 @@ public class SalarySlipService {
 
     /** Noms de tous les Salary Slip d'un employé, par période croissante. */
     public List<String> getSalarySlipNamesByEmployee(String employeeId) {
-        return client.list(SALARY_SLIP)
-                .fields("name")
-                .filters(Filters.where("employee", "=", employeeId))
-                .orderBy("start_date asc")
-                .fetchAll().stream()
-                .map(node -> node.path("name").asText())
-                .toList();
+        return getSalarySlipsByEmployee(employeeId).stream().map(SalarySlip::getName).toList();
     }
 
     /**
@@ -39,10 +36,14 @@ public class SalarySlipService {
         return toSalarySlip(client.getDoc(SALARY_SLIP, salarySlipName));
     }
 
-    /** Slips détaillés d'un employé (un appel par slip ; voir 3.4 / 5.1). */
+    /** Slips d'un employé (tous les champs affichés viennent de la liste : une seule requête paginée). */
     public List<SalarySlip> getSalarySlipsByEmployee(String employeeId) {
-        return getSalarySlipNamesByEmployee(employeeId).stream()
-                .map(this::getSalarySlipDetail)
+        return client.list(SALARY_SLIP)
+                .fields(FIELDS)
+                .filters(Filters.where("employee", "=", employeeId))
+                .orderBy("start_date asc")
+                .fetchAll().stream()
+                .map(SalarySlipService::toSalarySlip)
                 .toList();
     }
 

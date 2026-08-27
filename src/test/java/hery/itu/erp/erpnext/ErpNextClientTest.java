@@ -103,6 +103,32 @@ class ErpNextClientTest {
     }
 
     @Test
+    void listChildRowsEnvoieLeParentEtDecoupeEnLotsDe100() throws Exception {
+        List<String> names = java.util.stream.IntStream.rangeClosed(1, 150).mapToObj(i -> "S-" + i).toList();
+        ObjectMapper mapper = new ObjectMapper();
+        String firstBatch = mapper.writeValueAsString(names.subList(0, 100));
+        String secondBatch = mapper.writeValueAsString(names.subList(100, 150));
+
+        server.expect(requestTo(org.hamcrest.Matchers.startsWith("http://erp.test/api/resource/Salary%20Detail?")))
+                .andExpect(request -> assertThat(request.getURI().getQuery())
+                        .contains("fields=[\"parent\",\"amount\"]")
+                        .contains("filters=[[\"parent\",\"in\"," + firstBatch + "],[\"salary_component\",\"=\",\"Basic\"]]")
+                        .contains("order_by=parent asc")
+                        .contains("parent=Salary Slip"))
+                .andRespond(withSuccess("{\"data\":[{\"parent\":\"S-1\",\"amount\":10}]}", JSON));
+        server.expect(requestTo(org.hamcrest.Matchers.startsWith("http://erp.test/api/resource/Salary%20Detail?")))
+                .andExpect(request -> assertThat(request.getURI().getQuery())
+                        .contains("filters=[[\"parent\",\"in\"," + secondBatch + "]"))
+                .andRespond(withSuccess("{\"data\":[]}", JSON));
+
+        List<JsonNode> rows = client.listChildRows("Salary Detail", "Salary Slip", List.of("parent", "amount"),
+                names, Filters.where("salary_component", "=", "Basic"), "parent asc");
+
+        assertThat(rows).hasSize(1);
+        server.verify();
+    }
+
+    @Test
     void getDocEncodeLesEspacesMaisConserveLesSlashDuNom() {
         server.expect(requestTo("http://erp.test/api/resource/Salary%20Slip/Sal%20Slip/HR-EMP-00001/00001"))
                 .andRespond(withSuccess("{\"data\":{\"name\":\"Sal Slip/HR-EMP-00001/00001\",\"gross_pay\":1234.5}}", JSON));

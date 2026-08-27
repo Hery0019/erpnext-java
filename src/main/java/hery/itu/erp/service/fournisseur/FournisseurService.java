@@ -1,6 +1,7 @@
 package hery.itu.erp.service.fournisseur;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -12,6 +13,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import hery.itu.erp.erpnext.ErpNextClient;
+import hery.itu.erp.erpnext.ErpNextForbiddenException;
+import hery.itu.erp.erpnext.ErpNextValidationException;
 import hery.itu.erp.erpnext.Filters;
 import hery.itu.erp.model.Devis;
 import hery.itu.erp.model.Fournisseur;
@@ -23,6 +26,8 @@ public class FournisseurService {
     private static final Logger log = LoggerFactory.getLogger(FournisseurService.class);
     private static final String SUPPLIER = "Supplier";
     private static final String SUPPLIER_QUOTATION = "Supplier Quotation";
+    private static final String SUPPLIER_QUOTATION_ITEM = "Supplier Quotation Item";
+    private static final List<String> ITEM_FIELDS = List.of("parent", "item_code", "description", "qty", "uom", "rate", "amount", "warehouse");
 
     private final ErpNextClient client;
 
@@ -46,11 +51,11 @@ public class FournisseurService {
                 .orderBy("transaction_date desc")
                 .fetchAll();
 
+        Map<String, List<JsonNode>> itemsByQuotation = loadItems(quotations);
+
         List<Devis> devisList = new ArrayList<>();
         for (JsonNode quotation : quotations) {
             String devisName = quotation.path("name").asText();
-            // Les items ne sont disponibles que sur le document complet : un appel par devis (voir 3.4 / 5.1).
-            JsonNode full = client.getDoc(SUPPLIER_QUOTATION, devisName);
 
             Devis devis = new Devis();
             devis.setNumero(devisName);
@@ -60,7 +65,7 @@ public class FournisseurService {
 
             List<ItemDevis> items = new ArrayList<>();
             double total = 0.0;
-            for (JsonNode item : full.path("items")) {
+            for (JsonNode item : itemsByQuotation.getOrDefault(devisName, List.of())) {
                 ItemDevis itemDevis = new ItemDevis();
                 itemDevis.setCode(item.path("item_code").asText(null));
                 itemDevis.setDevis(devis);
@@ -116,6 +121,31 @@ public class FournisseurService {
         } else {
             log.info("Devis {} non soumis : au moins un item a un prix unitaire nul", devisId);
         }
+    }
+
+    /**
+     * Items de tous les devis en une requête par lot sur la table enfant (au lieu d'un GET par devis) ;
+     * repli sur un GET par devis si l'instance refuse la lecture directe de la table enfant.
+     */
+    private Map<String, List<JsonNode>> loadItems(List<JsonNode> quotations) {
+        List<String> names = quotations.stream().map(q -> q.path("name").asText()).toList();
+        Map<String, List<JsonNode>> byQuotation = new LinkedHashMap<>();
+        if (names.isEmpty()) {
+            return byQuotation;
+        }
+        try {
+            for (JsonNode row : client.listChildRows(SUPPLIER_QUOTATION_ITEM, SUPPLIER_QUOTATION, ITEM_FIELDS, names, null, "parent asc, idx asc")) {
+                byQuotation.computeIfAbsent(row.path("parent").asText(), k -> new ArrayList<>()).add(row);
+            }
+        } catch (ErpNextValidationException | ErpNextForbiddenException e) {
+            log.warn("Lecture groupée des items de devis refusée ({}) : repli sur un appel par devis", e.getErpNextMessage());
+            for (String name : names) {
+                List<JsonNode> items = new ArrayList<>();
+                client.getDoc(SUPPLIER_QUOTATION, name).path("items").forEach(items::add);
+                byQuotation.put(name, items);
+            }
+        }
+        return byQuotation;
     }
 
     private static double toDouble(Object value) {
