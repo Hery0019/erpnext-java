@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 import org.springframework.ui.Model;
+import hery.itu.erp.erpnext.ErpNextException;
 import hery.itu.erp.model.rh.Employee;
 import hery.itu.erp.service.rh.EmployeeService;
 
@@ -65,17 +66,17 @@ public class EmployeeController {
 
     @PostMapping("/employes/create")
     public String createEmployee(@ModelAttribute("employee") Employee employee, Model model) {
-        boolean success = employeeService.createEmployee(employee);
-
-        if (success) {
+        try {
+            employeeService.createEmployee(employee);
             return "redirect:/employes";
-        } else {
-            model.addAttribute("error", "Failed to create employee");
+        } catch (ErpNextException e) {
+            model.addAttribute("employee", employee);
+            model.addAttribute("error", "Création impossible : " + e.getErpNextMessage());
             return "employee-form";
         }
     }
 
-    @GetMapping("/employes/delete/{id}")
+    @PostMapping("/employes/delete/{id}")
     public String deleteEmploye(@PathVariable("id") String id) {
         employeeService.deleteEmploye(id);
         return "redirect:/employes";

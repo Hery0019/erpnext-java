@@ -1,8 +1,8 @@
 package hery.itu.erp.controller.salary;
 
-import java.math.BigDecimal;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.time.Year;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.IntStream;
 
 import org.springframework.stereotype.Controller;
@@ -18,6 +18,8 @@ import hery.itu.erp.service.salary.SalaryTotalService;
 @Controller
 public class SalaryTotalController {
 
+    private static final int FIRST_YEAR = 2020;
+
     private final SalaryTotalService salaryTotalService;
 
     public SalaryTotalController(SalaryTotalService salaryTotalService) {
@@ -27,73 +29,28 @@ public class SalaryTotalController {
     @GetMapping("/salary-total")
     public String showSalaryTotal(
             @RequestParam(name = "month", required = false, defaultValue = "") String month,
-            @RequestParam(name = "year", required = false, defaultValue = "2025") String year,
+            @RequestParam(name = "year", required = false, defaultValue = "") String year,
             Model model) {
 
-        List<SalaryDTO> allSalaries = salaryTotalService.getAllSalary();
+        int selectedYear = parseYear(year);
+        Integer selectedMonth = parseMonth(month);
 
-        List<String> months = IntStream.rangeClosed(1, 12)
-                .mapToObj(m -> String.format("%02d", m))
-                .toList();
+        List<SalaryDTO> slips = salaryTotalService.getDetailedSlips(selectedYear, selectedMonth);
+        Map<String, SalaryGroupedDTO> grouped = salaryTotalService.groupByMonth(slips);
 
-        List<String> years = IntStream.rangeClosed(2020, 2030)
-                .mapToObj(String::valueOf)
-                .toList();
-
-        List<SalaryDTO> filteredSalaries;
-        if (!month.isEmpty()) {
-            String fullMonth = year + "-" + month;
-            filteredSalaries = allSalaries.stream()
-                    .filter(s -> s.getMonth().equals(fullMonth))
-                    .map(slip -> salaryTotalService.getSalarySlipDetail(slip.getSlipName()))
-                    .toList();
-        } else {
-            filteredSalaries = allSalaries.stream()
-                    .filter(s -> s.getMonth().startsWith(year))
-                    .map(slip -> salaryTotalService.getSalarySlipDetail(slip.getSlipName()))
-                    .toList();
-        }
-
-        // Regroupement des salaires par mois
-        Map<String, SalaryGroupedDTO> groupedMap = new TreeMap<>();
-        for (SalaryDTO detailed : filteredSalaries) {
-            String monthKey = detailed.getMonth();
-            SalaryGroupedDTO group = groupedMap.getOrDefault(monthKey, new SalaryGroupedDTO());
-            group.setMonth(monthKey);
-
-            group.setTotalGross(group.getTotalGross().add(detailed.getGrossPay()));
-            group.setTotalDeduction(group.getTotalDeduction().add(detailed.getTotalDeduction()));
-            group.setTotalNet(group.getTotalNet().add(detailed.getNetPay()));
-
-            if (detailed.getEarnings() != null) {
-                for (var e : detailed.getEarnings()) {
-                    group.getEarningsTotal().merge(e.getSalaryComponent(), e.getAmount(), BigDecimal::add);
-                }
-            }
-
-            if (detailed.getDeductions() != null) {
-                for (var d : detailed.getDeductions()) {
-                    group.getDeductionsTotal().merge(d.getSalaryComponent(), d.getAmount(), BigDecimal::add);
-                }
-            }
-
-            groupedMap.put(monthKey, group);
-        }
-
-        model.addAttribute("groupedSalaries", groupedMap.values());
-        model.addAttribute("filterMonth", month);
-        model.addAttribute("filterYear", year);
-        model.addAttribute("months", months);
-        model.addAttribute("years", years);
-        model.addAttribute("selectedYear", year);
-
+        model.addAttribute("groupedSalaries", grouped.values());
+        model.addAttribute("filterMonth", selectedMonth == null ? "" : String.format("%02d", selectedMonth));
+        model.addAttribute("filterYear", String.valueOf(selectedYear));
+        model.addAttribute("months", IntStream.rangeClosed(1, 12).mapToObj(m -> String.format("%02d", m)).toList());
+        model.addAttribute("years", IntStream.rangeClosed(FIRST_YEAR, Year.now().getValue() + 1).mapToObj(String::valueOf).toList());
+        model.addAttribute("selectedYear", String.valueOf(selectedYear));
         return "salary_total";
     }
 
     @GetMapping("/salary-total/show")
     public String showSalaries(
             @RequestParam(name = "month", required = false, defaultValue = "") String month,
-            @RequestParam(name = "year", required = false, defaultValue = "2025") String year,
+            @RequestParam(name = "year", required = false, defaultValue = "") String year,
             Model model) {
         return showSalaryTotal(month, year, model);
     }
@@ -102,22 +59,8 @@ public class SalaryTotalController {
     @ResponseBody
     public List<SalaryDTO> getSalaryTotalJson(
             @RequestParam(name = "month", required = false, defaultValue = "") String month,
-            @RequestParam(name = "year", required = false, defaultValue = "2025") String year) {
-
-        List<SalaryDTO> allSalaries = salaryTotalService.getAllSalary();
-
-        if (!month.isEmpty()) {
-            String fullMonth = year + "-" + month;
-            return allSalaries.stream()
-                    .filter(s -> s.getMonth().equals(fullMonth))
-                    .map(slip -> salaryTotalService.getSalarySlipDetail(slip.getSlipName()))
-                    .toList();
-        } else {
-            return allSalaries.stream()
-                    .filter(s -> s.getMonth().startsWith(year))
-                    .map(slip -> salaryTotalService.getSalarySlipDetail(slip.getSlipName()))
-                    .toList();
-        }
+            @RequestParam(name = "year", required = false, defaultValue = "") String year) {
+        return salaryTotalService.getDetailedSlips(parseYear(year), parseMonth(month));
     }
 
     @GetMapping("/salary-total/month-detail")
@@ -125,15 +68,39 @@ public class SalaryTotalController {
             @RequestParam("year") int year,
             @RequestParam("month") int month,
             Model model) {
-
-        List<SalaryDTO> salaries = salaryTotalService.getSalarySlipsByMonth(year, month);
-
-        model.addAttribute("salaries", salaries);
+        if (month < 1 || month > 12) {
+            throw new IllegalArgumentException("Mois invalide : " + month);
+        }
+        model.addAttribute("salaries", salaryTotalService.getDetailedSlips(year, month));
         model.addAttribute("year", year);
         model.addAttribute("month", String.format("%02d", month));
-        
-        return "salary_detail_by_month"; // À créer en tant que page Thymeleaf
+        return "salary_detail_by_month";
     }
 
-    
+    /** Année demandée, ou l'année courante par défaut (plus de 2025 en dur). */
+    private static int parseYear(String year) {
+        if (year == null || year.isBlank()) {
+            return Year.now().getValue();
+        }
+        try {
+            return Integer.parseInt(year.trim());
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Année invalide : " + year);
+        }
+    }
+
+    private static Integer parseMonth(String month) {
+        if (month == null || month.isBlank()) {
+            return null;
+        }
+        try {
+            int value = Integer.parseInt(month.trim());
+            if (value < 1 || value > 12) {
+                throw new IllegalArgumentException("Mois invalide : " + month);
+            }
+            return value;
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Mois invalide : " + month);
+        }
+    }
 }

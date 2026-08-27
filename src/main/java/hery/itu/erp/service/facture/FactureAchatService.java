@@ -1,296 +1,109 @@
-
 package hery.itu.erp.service.facture;
 
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
+import com.fasterxml.jackson.databind.JsonNode;
+
+import hery.itu.erp.config.PaymentProperties;
+import hery.itu.erp.erpnext.ErpNextClient;
 import hery.itu.erp.model.DetailsFacture;
 import hery.itu.erp.model.FactureAchat;
 import hery.itu.erp.model.Item;
-import hery.itu.erp.service.login.LoginService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.*;
-import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
-
-import java.text.SimpleDateFormat;
-import java.util.*;
 
 @Service
 public class FactureAchatService {
 
-    @Autowired
-    private RestTemplate restTemplate;
+    private static final Logger log = LoggerFactory.getLogger(FactureAchatService.class);
+    private static final String PURCHASE_INVOICE = "Purchase Invoice";
+    private static final String PAYMENT_ENTRY = "Payment Entry";
 
-    @Autowired
-    private LoginService loginService;
+    private final ErpNextClient client;
+    private final PaymentProperties payment;
 
-    public List<FactureAchat> getFacturesParFournisseur(String fournisseurNom) {
-        String url = "http://erpnext.localhost:8000/api/resource/Purchase Invoice"
-                + "?fields=[\"name\",\"supplier\",\"posting_date\",\"status\",\"grand_total\"]"
-                + "&filters=[[\"supplier\",\"=\",\"" + fournisseurNom + "\"]]";
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Cookie", loginService.getSessionCookie());
-        HttpEntity<String> entity = new HttpEntity<>(headers);
-
-        ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
-
-        List<Map<String, Object>> data = (List<Map<String, Object>>) response.getBody().get("data");
-        List<FactureAchat> factures = new ArrayList<>();
-
-        for (Map<String, Object> item : data) {
-            FactureAchat f = new FactureAchat();
-            f.setName((String) item.get("name"));
-            f.setSupplier((String) item.get("supplier"));
-            f.setPostingDate((String) item.get("posting_date"));
-            f.setStatus((String) item.get("status"));
-            f.setGrandTotal(Double.parseDouble(item.get("grand_total").toString()));
-            factures.add(f);
-        }
-
-        return factures;
+    public FactureAchatService(ErpNextClient client, PaymentProperties payment) {
+        this.client = client;
+        this.payment = payment;
     }
 
     public List<FactureAchat> getAllFactures() {
-        String url = "http://erpnext.localhost:8000/api/resource/Purchase Invoice"
-                + "?fields=[\"name\",\"supplier\",\"posting_date\",\"status\",\"grand_total\"]";
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Cookie", loginService.getSessionCookie());
-        HttpEntity<String> entity = new HttpEntity<>(headers);
-
-        ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
-
-        List<Map<String, Object>> data = (List<Map<String, Object>>) response.getBody().get("data");
-        List<FactureAchat> factures = new ArrayList<>();
-
-        for (Map<String, Object> item : data) {
-            FactureAchat f = new FactureAchat();
-            f.setName((String) item.get("name"));
-            f.setSupplier((String) item.get("supplier"));
-            f.setPostingDate((String) item.get("posting_date"));
-            f.setStatus((String) item.get("status"));
-            f.setGrandTotal(Double.parseDouble(item.get("grand_total").toString()));
-            factures.add(f);
-        }
-
-        return factures;
+        return client.list(PURCHASE_INVOICE)
+                .fields("name", "supplier", "supplier_name", "posting_date", "status", "grand_total", "outstanding_amount")
+                .orderBy("posting_date desc")
+                .fetchAll().stream()
+                .map(FactureAchatService::toFacture)
+                .toList();
     }
 
     public FactureAchat getFactureByName(String name) {
-        String url = "http://erpnext.localhost:8000/api/resource/Purchase Invoice/" + name + "?fields=[\"name\",\"supplier\",\"posting_date\",\"status\",\"grand_total\"]";
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Cookie", loginService.getSessionCookie());
-        HttpEntity<String> entity = new HttpEntity<>(headers);
-        ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
-        Map<String, Object> data = (Map<String, Object>) response.getBody().get("data");
-        FactureAchat f = new FactureAchat();
-        f.setName((String) data.get("name"));
-        f.setSupplier((String) data.get("supplier"));
-        f.setPostingDate((String) data.get("posting_date"));
-        f.setStatus((String) data.get("status"));
-        f.setGrandTotal(Double.parseDouble(data.get("grand_total").toString()));
-        return f;
+        return toFacture(client.getDoc(PURCHASE_INVOICE, name));
     }
 
     public DetailsFacture getDetailsFacture(String factureNom) {
-        try {
-            String url = "http://erpnext.localhost:8000/api/resource/Purchase Invoice/" + factureNom;
-            
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("Cookie", loginService.getSessionCookie());
-            headers.set("Accept", "application/json");
-            HttpEntity<String> entity = new HttpEntity<>(headers);
-            System.out.println("ETOOOOOOOOOO : ");
-            
-            ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
-            
-            if (response.getBody() != null) {
-                Map<String, Object> data = (Map<String, Object>) response.getBody().get("data");
-                if (data != null && data.get("items") != null) {
-                    List<Map<String, Object>> itemsData = (List<Map<String, Object>>) data.get("items");
-                    
-                    // Créer la facture
-                    String name = (String) data.get("name");
-                    String supplierName = (String) data.get("supplier_name");
-                    String postingDateStr = (String) data.get("posting_date");
-                    String status = (String) data.get("status");
-                    String outstandingAmountStr = data.get("outstanding_amount").toString();
-                    
-                    // Conversion de la date
-                    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-                    Date postingDate = sdf.parse(postingDateStr);
-                    
-                    // Conversion du montant
-                    Double outstandingAmount = Double.parseDouble(outstandingAmountStr);
-                    
-                    // Création de l'objet FactureAchat avec le constructeur
-                    FactureAchat factureAchat = new FactureAchat(name, supplierName, postingDateStr, status, outstandingAmount);
-                    
-                    // Créer la liste des items
-                    List<Item> itemList = new ArrayList<>();
-                    for (Map<String, Object> itemData : itemsData) {
-                        Item item = new Item();
-                        item.setItem_code((String) itemData.get("item_code"));
-                        item.setItem_name((String) itemData.get("item_name"));
-                        
-                        // Conversion sûre des nombres
-                        Object qtyObj = itemData.get("qty");
-                        if (qtyObj != null) {
-                            if (qtyObj instanceof Integer) {
-                                item.setQty((Integer) qtyObj);
-                            } else if (qtyObj instanceof Double) {
-                                item.setQty(((Double) qtyObj).intValue());
-                            }
-                        }
+        JsonNode data = client.getDoc(PURCHASE_INVOICE, factureNom);
 
-                        Object rateObj = itemData.get("rate");
-                        if (rateObj != null) {
-                            if (rateObj instanceof Double) {
-                                item.setRate((Double) rateObj);
-                            } else if (rateObj instanceof Integer) {
-                                item.setRate(((Integer) rateObj).doubleValue());
-                            }
-                        }
-
-                        Object amountObj = itemData.get("amount");
-                        if (amountObj != null) {
-                            if (amountObj instanceof Double) {
-                                item.setAmount((Double) amountObj);
-                            } else if (amountObj instanceof Integer) {
-                                item.setAmount(((Integer) amountObj).doubleValue());
-                            }
-                        }
-
-                        itemList.add(item);
-                    }
-                    System.out.println("Data reçu de l'API : " + data);
-                    
-                    // Créer et retourner l'objet DetailsFacture
-                    return new DetailsFacture(factureAchat, itemList, data.get("grand_total").toString());
-                }
-            }
-            
-            return null;
-        } catch (Exception e) {
-            System.err.println("Erreur lors de la récupération des détails de la facture: " + e.getMessage());
-            e.printStackTrace();
-            return null;
+        List<Item> items = new ArrayList<>();
+        for (JsonNode itemData : data.path("items")) {
+            Item item = new Item();
+            item.setItem_code(itemData.path("item_code").asText(null));
+            item.setItem_name(itemData.path("item_name").asText(null));
+            item.setQty(itemData.path("qty").asInt(0));
+            item.setRate(itemData.path("rate").asDouble(0.0));
+            item.setAmount(itemData.path("amount").asDouble(0.0));
+            items.add(item);
         }
+        return new DetailsFacture(toFacture(data), items, data.path("grand_total").asText("0"));
     }
 
+    /**
+     * Crée puis soumet un Payment Entry référençant la facture, débité du compte configuré
+     * ({@code erp.payment.paid-from-account}).
+     *
+     * @throws hery.itu.erp.erpnext.ErpNextException si ERPNext refuse le paiement (montant, compte, droits…)
+     */
+    public void payerFacture(String factureNom, double amount) {
+        JsonNode facture = client.getDoc(PURCHASE_INVOICE, factureNom);
 
-    public boolean payerFacture(String factureNom, Double amount) {
-        try {
-            // D'abord, obtenons les détails de la facture pour avoir la société
-            String factureUrl = "http://erpnext.localhost:8000/api/resource/Purchase Invoice/" + factureNom;
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("Cookie", loginService.getSessionCookie());
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            HttpEntity<String> factureEntity = new HttpEntity<>(headers);
-            
-            ResponseEntity<Map> factureResponse = restTemplate.exchange(factureUrl, HttpMethod.GET, factureEntity, Map.class);
-            Map<String, Object> factureData = (Map<String, Object>) factureResponse.getBody().get("data");
-            String company = (String) factureData.get("company");
-            
-            // Maintenant créons le Payment Entry
-            String url = "http://erpnext.localhost:8000/api/resource/Payment Entry";
-            
-            // Create payment entry data
-            Map<String, Object> paymentData = new HashMap<>();
-            paymentData.put("doctype", "Payment Entry");
-            paymentData.put("naming_series", "PE-.YYYY.-");
-            paymentData.put("payment_type", "Pay");
-            paymentData.put("party_type", "Supplier");
-            paymentData.put("party", getSupplierFromFacture(factureNom));
-            paymentData.put("posting_date", new SimpleDateFormat("yyyy-MM-dd").format(new Date()));
-            paymentData.put("company", company);
-            paymentData.put("paid_amount", amount);
-            paymentData.put("received_amount", amount);
-            
-            // Champs obligatoires pour la validation
-            paymentData.put("source_exchange_rate", 1.0);
-            paymentData.put("target_exchange_rate", 1.0);
-            
-            // Définir directement le compte de paiement
-            paymentData.put("paid_from", "Capital Social - RS");
-            paymentData.put("paid_from_account_currency", "EUR");
-            
-            List<Map<String, Object>> references = new ArrayList<>();
-            Map<String, Object> reference = new HashMap<>();
-            reference.put("reference_doctype", "Purchase Invoice");
-            reference.put("reference_name", factureNom);
-            reference.put("allocated_amount", amount);
-            references.add(reference);
-            
-            paymentData.put("references", references);
-            
-            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(paymentData, headers);
-            ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.POST, entity, Map.class);
-            
-            if (response.getStatusCode() == HttpStatus.OK) {
-                Map<String, Object> responseData = (Map<String, Object>) response.getBody().get("data");
-                String paymentEntryName = (String) responseData.get("name");
-                String submitUrl = "http://erpnext.localhost:8000/api/resource/Payment Entry/" + paymentEntryName;
-                Map<String, Object> submitData = new HashMap<>();
-                submitData.put("docstatus", 1); // 1 pour soumis
-                HttpEntity<Map<String, Object>> submitEntity = new HttpEntity<>(submitData, headers);
-                ResponseEntity<Map> submitResponse = restTemplate.exchange(submitUrl, HttpMethod.PUT, submitEntity, Map.class);
-                
-                return submitResponse.getStatusCode() == HttpStatus.OK;
-            }
-            
-            return false;
-        } catch (Exception e) {
-            System.err.println("Erreur lors du paiement de la facture: " + e.getMessage());
-            e.printStackTrace();
-            return false;
-        }
-    }
-    
-    public Map<String, String> getComptesParEntreprise(String company) {
-        try {
-            String url = "http://erpnext.localhost:8000/api/resource/Company/" + company;
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("Cookie", loginService.getSessionCookie());
-            HttpEntity<String> entity = new HttpEntity<>(headers);
-    
-            ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
-            Map<String, Object> data = (Map<String, Object>) response.getBody().get("data");
-    
-            // Supposons que la structure des comptes dans ERPNext soit dans les champs `paid_from_account` et `paid_to_account`
-            String paidFromAccount = (String) data.get("paid_from_account");
-            String paidToAccount = (String) data.get("paid_to_account");
-    
-            Map<String, String> comptes = new HashMap<>();
-            comptes.put("paid_from", paidFromAccount);
-            comptes.put("paid_to", paidToAccount);
-    
-            return comptes;
-        } catch (Exception e) {
-            System.err.println("Erreur lors de la récupération des comptes pour l'entreprise " + company + " : " + e.getMessage());
-            return Collections.emptyMap();  // Retourne une carte vide si erreur
-        }
-    }
-    
-    
-    public String getCompanyFromFacture(String factureNom) {
-        try {
-            String url = "http://erpnext.localhost:8000/api/resource/Purchase Invoice/" + factureNom;
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("Cookie", loginService.getSessionCookie());
-            HttpEntity<String> entity = new HttpEntity<>(headers);
-    
-            ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
-            Map<String, Object> data = (Map<String, Object>) response.getBody().get("data");
-            return (String) data.get("company");
-        } catch (Exception e) {
-            System.err.println("Erreur lors de la récupération de l'entreprise : " + e.getMessage());
-            return null;
-        }
-    }
-    
+        Map<String, Object> paymentData = new HashMap<>();
+        paymentData.put("doctype", PAYMENT_ENTRY);
+        paymentData.put("naming_series", payment.namingSeries());
+        paymentData.put("payment_type", "Pay");
+        paymentData.put("party_type", "Supplier");
+        paymentData.put("party", facture.path("supplier").asText());
+        paymentData.put("posting_date", LocalDate.now().toString());
+        paymentData.put("company", facture.path("company").asText());
+        paymentData.put("paid_amount", amount);
+        paymentData.put("received_amount", amount);
+        paymentData.put("source_exchange_rate", 1.0);
+        paymentData.put("target_exchange_rate", 1.0);
+        paymentData.put("paid_from", payment.paidFromAccount());
+        paymentData.put("paid_from_account_currency", payment.paidFromCurrency());
+        paymentData.put("references", List.of(Map.of(
+                "reference_doctype", PURCHASE_INVOICE,
+                "reference_name", factureNom,
+                "allocated_amount", amount)));
 
-    private String getSupplierFromFacture(String factureNom) {
-        DetailsFacture details = getDetailsFacture(factureNom);
-        return details != null ? details.getFacture().getSupplierName() : null;
-    } 
+        String paymentEntryName = client.insert(PAYMENT_ENTRY, paymentData).path("name").asText();
+        client.update(PAYMENT_ENTRY, paymentEntryName, Map.of("docstatus", 1));
+        log.info("Paiement {} soumis pour la facture {}", paymentEntryName, factureNom);
+    }
+
+    private static FactureAchat toFacture(JsonNode node) {
+        FactureAchat f = new FactureAchat();
+        f.setName(node.path("name").asText(null));
+        f.setSupplier(node.path("supplier").asText(null));
+        f.setSupplierName(node.path("supplier_name").asText(null));
+        f.setPostingDate(node.path("posting_date").asText(null));
+        f.setStatus(node.path("status").asText(null));
+        f.setGrandTotal(node.path("grand_total").asDouble(0.0));
+        f.setOutstandingAmount(node.path("outstanding_amount").asDouble(0.0));
+        return f;
+    }
 }

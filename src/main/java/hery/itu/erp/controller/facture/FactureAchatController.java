@@ -1,23 +1,30 @@
 package hery.itu.erp.controller.facture;
 
-import hery.itu.erp.model.FactureAchat;
-import hery.itu.erp.service.facture.FactureAchatService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
+import java.util.List;
+
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import hery.itu.erp.erpnext.ErpNextException;
 import hery.itu.erp.model.DetailsFacture;
-import java.util.List;
-import java.util.Map;
+import hery.itu.erp.model.FactureAchat;
+import hery.itu.erp.service.facture.FactureAchatService;
 
 @Controller
 @RequestMapping("/factures")
 public class FactureAchatController {
 
-    @Autowired
-    private FactureAchatService factureAchatService;
+    private final FactureAchatService factureAchatService;
+
+    public FactureAchatController(FactureAchatService factureAchatService) {
+        this.factureAchatService = factureAchatService;
+    }
 
     @GetMapping("")
     public String afficherFactures(Model model) {
@@ -36,22 +43,26 @@ public class FactureAchatController {
     @GetMapping("/{factureNom}/detailsFacture")
     public String voirDetailsFacture(@PathVariable String factureNom, Model model) {
         DetailsFacture detailsFacture = factureAchatService.getDetailsFacture(factureNom);
-        if (detailsFacture != null) {
-            model.addAttribute("detailsFactures", detailsFacture);
-            return "details_facture";
-        } else {
-            // Gérer l'erreur ici
-            return "redirect:/error";
-        }
+        model.addAttribute("detailsFactures", detailsFacture);
+        return "details_facture";
     }
 
+    /** Formulaire HTML : le résultat est affiché sur la page de détail (message flash). */
     @PostMapping("/{factureNom}/payer")
-    public ResponseEntity<?> payerFacture(@PathVariable String factureNom, @RequestParam Double amount) {
-        boolean success = factureAchatService.payerFacture(factureNom, amount);
-        if (success) {
-            return ResponseEntity.ok().body(Map.of("message", "Paiement effectué avec succès"));
+    public String payerFacture(@PathVariable String factureNom, @RequestParam double amount,
+                               RedirectAttributes redirectAttributes) {
+        if (amount <= 0) {
+            redirectAttributes.addFlashAttribute("error", "Le montant à payer doit être positif.");
         } else {
-            return ResponseEntity.badRequest().body(Map.of("message", "Erreur lors du paiement"));
+            try {
+                factureAchatService.payerFacture(factureNom, amount);
+                redirectAttributes.addFlashAttribute("success",
+                        "Paiement de " + amount + " enregistré et soumis pour la facture " + factureNom + ".");
+            } catch (ErpNextException e) {
+                redirectAttributes.addFlashAttribute("error", "Paiement refusé par ERPNext : " + e.getErpNextMessage());
+            }
         }
+        redirectAttributes.addAttribute("name", factureNom);
+        return "redirect:/factures/{name}/detailsFacture";
     }
 }

@@ -7,6 +7,8 @@ from dateutil.parser import parse
 
 @frappe.whitelist()
 def import_csv_files(file1=None, file2=None, file3=None):
+    # Revue 2.6 : la méthode contourne les permissions (ignore_permissions) -> réservée aux rôles RH.
+    frappe.only_for(["HR Manager", "System Manager"])
     if not (file1 and file2 and file3):
         frappe.throw("3 fichiers requis.")
 

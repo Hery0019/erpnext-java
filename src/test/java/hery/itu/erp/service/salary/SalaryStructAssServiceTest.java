@@ -1,0 +1,274 @@
+package hery.itu.erp.service.salary;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
+
+import java.math.BigDecimal;
+import java.util.List;
+
+import org.hamcrest.Matchers;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.web.client.MockServerRestTemplateCustomizer;
+import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.test.json.JsonCompareMode;
+import org.springframework.test.web.client.MockRestServiceServer;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import hery.itu.erp.config.ErpNextProperties;
+import hery.itu.erp.erpnext.ErpNextClient;
+import hery.itu.erp.model.salary.SalaryFilterDTO;
+import hery.itu.erp.model.salary.SalaryStructAss;
+import hery.itu.erp.service.login.LoginService;
+import hery.itu.erp.service.salary.SalaryStructAssService.AssignmentAndSlips;
+import hery.itu.erp.service.salary.SalaryStructAssService.SlipPeriod;
+
+class SalaryStructAssServiceTest {
+
+    private static final MediaType JSON = MediaType.APPLICATION_JSON;
+    private static final String SSA_URL = "http://erp.test/api/resource/Salary%20Structure%20Assignment";
+    private static final String SLIP_URL = "http://erp.test/api/resource/Salary%20Slip";
+
+    private MockRestServiceServer server;
+    private SalaryStructAssService service;
+
+    @BeforeEach
+    void setUp() {
+        MockServerRestTemplateCustomizer customizer = new MockServerRestTemplateCustomizer();
+        LoginService loginService = mock(LoginService.class);
+        when(loginService.getSessionCookie()).thenReturn("sid=abc");
+        ErpNextClient client = new ErpNextClient(new RestTemplateBuilder(customizer),
+                new ErpNextProperties("http://erp.test"), loginService, new ObjectMapper());
+        service = new SalaryStructAssService(client);
+        server = customizer.getServer();
+    }
+
+    @Test
+    void getAssignmentByIdMappeLeDocumentAvecUneBaseExacte() {
+        server.expect(requestTo(SSA_URL + "/HR-SSA-2025-00001"))
+                .andRespond(withSuccess("{\"data\":{\"name\":\"HR-SSA-2025-00001\",\"employee\":\"HR-EMP-00001\","
+                        + "\"salary_structure\":\"Standard\",\"base\":1234.56,\"docstatus\":1,\"champ_inconnu\":1}}", JSON));
+
+        SalaryStructAss ass = service.getAssignmentById("HR-SSA-2025-00001");
+
+        assertThat(ass.getName()).isEqualTo("HR-SSA-2025-00001");
+        assertThat(ass.getEmployee()).isEqualTo("HR-EMP-00001");
+        assertThat(ass.getBase()).isEqualByComparingTo(new BigDecimal("1234.56"));
+        assertThat(ass.getDocstatus()).isEqualTo(1);
+    }
+
+    @Test
+    void creationDuSsaUtiliseLeNomRenvoyeParErpNextPourLeSoumettre() {
+        server.expect(requestTo(SSA_URL))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(content().json("{\"employee\":\"HR-EMP-00001\",\"salary_structure\":\"Standard\","
+                        + "\"company\":\"Orinasa SA\",\"currency\":\"MGA\",\"base\":\"1500\",\"from_date\":\"2025-03-01\",\"to_date\":\"2025-03-31\"}"))
+                .andRespond(withSuccess("{\"data\":{\"name\":\"HR-SSA-2025-00007\"}}", JSON));
+        server.expect(requestTo(SSA_URL + "/HR-SSA-2025-00007?run_method=submit"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("{}", JSON));
+
+        SalaryStructAss ass = assignment("HR-EMP-00001", "2025-03-01", "2025-03-31", "1500");
+
+        assertThat(service.createSalaryStructureAssignmentAndSubmit(ass)).isEqualTo("HR-SSA-2025-00007");
+        server.verify();
+    }
+
+    @Test
+    void leSlipEstSoumisSousLeNomAttribueParErpNext() {
+        server.expect(requestTo(SLIP_URL))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(request -> assertThat(request.getBody().toString()).doesNotContain("\"name\""))
+                .andExpect(content().json("{\"employee\":\"HR-EMP-00001\",\"start_date\":\"2025-03-01\","
+                        + "\"end_date\":\"2025-03-31\",\"posting_date\":\"2025-03-31\",\"payroll_frequency\":\"Monthly\"}", JsonCompareMode.LENIENT))
+                .andRespond(withSuccess("{\"data\":{\"name\":\"Sal Slip/HR-EMP-00001/00009\"}}", JSON));
+        server.expect(requestTo(SLIP_URL + "/Sal%20Slip/HR-EMP-00001/00009?run_method=submit"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("{}", JSON));
+
+        SalaryStructAss ass = assignment("HR-EMP-00001", "2025-03-01", "2025-03-31", "1500");
+
+        assertThat(service.createSalarySlipAndSubmit(ass)).isEqualTo("Sal Slip/HR-EMP-00001/00009");
+        server.verify();
+    }
+
+    @Test
+    void lExistenceDUnSsaIgnoreLesDocumentsAnnulesEtCibleLEmploye() {
+        server.expect(requestTo(Matchers.startsWith(SSA_URL + "?")))
+                .andExpect(request -> assertThat(request.getURI().getQuery()).contains(
+                        "filters=[[\"employee\",\"=\",\"HR-EMP-00001\"],[\"from_date\",\"=\",\"2025-03-01\"],[\"docstatus\",\"in\",[0,1]]]"))
+                .andRespond(withSuccess("{\"data\":[]}", JSON));
+
+        assertThat(service.findAssignmentName("HR-EMP-00001", "2025-03-01")).isEmpty();
+    }
+
+    @Test
+    void rechercheDuSsaActifFiltreParEmployeDateEtDocstatus() {
+        server.expect(requestTo(Matchers.startsWith(SSA_URL + "?")))
+                .andExpect(request -> assertThat(request.getURI().getQuery()).isEqualTo(
+                        "fields=[\"name\",\"from_date\"]"
+                        + "&filters=[[\"employee\",\"=\",\"HR-EMP-00001\"],[\"from_date\",\"<=\",\"2025-03-31\"],[\"docstatus\",\"in\",[0,1]]]"
+                        + "&order_by=from_date desc, creation desc&limit_start=0&limit_page_length=1"))
+                .andRespond(withSuccess("{\"data\":[{\"name\":\"HR-SSA-2025-00003\",\"from_date\":\"2025-01-01\"}]}", JSON));
+
+        String name = service.getSalaryStructureAssignmentByEmployeeAndDate(
+                new SalaryFilterDTO("Sal Slip/HR-EMP-00001/00003", "HR-EMP-00001", "Basic", 1000.0, "2025-03-31"));
+
+        assertThat(name).isEqualTo("HR-SSA-2025-00003");
+    }
+
+    @Test
+    void remplacerUnSsaSoumisAnnuleEtAmendeSansJamaisSupprimer() {
+        // 1. lecture du SSA existant (soumis)
+        server.expect(requestTo(SSA_URL + "/HR-SSA-2025-00001"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("{\"data\":{\"name\":\"HR-SSA-2025-00001\",\"employee\":\"HR-EMP-00001\","
+                        + "\"salary_structure\":\"Standard\",\"company\":\"Orinasa SA\",\"currency\":\"MGA\","
+                        + "\"from_date\":\"2025-03-01\",\"to_date\":\"2025-03-31\",\"base\":1000,\"docstatus\":1}}", JSON));
+        // 2. le slip soumis de la période est annulé (pas supprimé)
+        server.expect(requestTo(SLIP_URL + "/Sal%20Slip/HR-EMP-00001/00003?run_method=cancel"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("{}", JSON));
+        // 3. le SSA est annulé (pas supprimé)
+        server.expect(requestTo(SSA_URL + "/HR-SSA-2025-00001?run_method=cancel"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("{}", JSON));
+        // 4. un SSA amendé est créé avec la nouvelle base, puis soumis
+        server.expect(requestTo(SSA_URL))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(content().json("{\"employee\":\"HR-EMP-00001\",\"base\":\"1100\",\"amended_from\":\"HR-SSA-2025-00001\","
+                        + "\"from_date\":\"2025-03-01\",\"to_date\":\"2025-03-31\",\"salary_structure\":\"Standard\"}", JsonCompareMode.LENIENT))
+                .andRespond(withSuccess("{\"data\":{\"name\":\"HR-SSA-2025-00001-1\"}}", JSON));
+        server.expect(requestTo(SSA_URL + "/HR-SSA-2025-00001-1?run_method=submit"))
+                .andRespond(withSuccess("{}", JSON));
+        // 5. le slip est recréé sur sa période, amendé depuis l'ancien, puis soumis
+        server.expect(requestTo(SLIP_URL))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(content().json("{\"employee\":\"HR-EMP-00001\",\"start_date\":\"2025-03-01\",\"end_date\":\"2025-03-31\","
+                        + "\"posting_date\":\"2025-03-31\",\"amended_from\":\"Sal Slip/HR-EMP-00001/00003\"}", JsonCompareMode.LENIENT))
+                .andRespond(withSuccess("{\"data\":{\"name\":\"Sal Slip/HR-EMP-00001/00003-1\"}}", JSON));
+        server.expect(requestTo(SLIP_URL + "/Sal%20Slip/HR-EMP-00001/00003-1?run_method=submit"))
+                .andRespond(withSuccess("{}", JSON));
+
+        SalaryStructAss updated = new SalaryStructAss();
+        updated.setName("HR-SSA-2025-00001");
+        updated.setBase(new BigDecimal("1100"));
+        SlipPeriod slip = new SlipPeriod("Sal Slip/HR-EMP-00001/00003", "2025-03-01", "2025-03-31", "2025-03-31", 1);
+
+        AssignmentAndSlips result = service.replaceAssignment(updated, List.of(slip));
+
+        assertThat(result.assignment()).isEqualTo("HR-SSA-2025-00001-1");
+        assertThat(result.slips()).containsExactly("Sal Slip/HR-EMP-00001/00003-1");
+        server.verify(); // toute requête DELETE aurait fait échouer le test (non attendue)
+    }
+
+    @Test
+    void retirerUnSlipSupprimeUnBrouillonMaisAnnuleUnSoumis() {
+        server.expect(requestTo(SLIP_URL + "/Sal%20Slip/HR-EMP-00001/00001"))
+                .andExpect(method(HttpMethod.DELETE))
+                .andRespond(withSuccess("{}", JSON));
+        server.expect(requestTo(SLIP_URL + "/Sal%20Slip/HR-EMP-00001/00002?run_method=cancel"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("{}", JSON));
+
+        service.retireSlip(new SlipPeriod("Sal Slip/HR-EMP-00001/00001", "2025-01-01", "2025-01-31", "2025-01-31", 0));
+        service.retireSlip(new SlipPeriod("Sal Slip/HR-EMP-00001/00002", "2025-02-01", "2025-02-28", "2025-02-28", 1));
+
+        server.verify();
+    }
+
+    @Test
+    void supprimerUnSsaSoumisLAnnuleSeulement() {
+        server.expect(requestTo(SSA_URL + "/HR-SSA-2025-00001"))
+                .andRespond(withSuccess("{\"data\":{\"name\":\"HR-SSA-2025-00001\",\"docstatus\":1}}", JSON));
+        server.expect(requestTo(SSA_URL + "/HR-SSA-2025-00001?run_method=cancel"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("{}", JSON));
+
+        service.deleteAssignment("HR-SSA-2025-00001");
+
+        server.verify();
+    }
+
+    @Test
+    void lesValeursDUnComposantSontLuesEnUneRequeteSurLaTableEnfant() {
+        server.expect(requestTo(Matchers.startsWith(SLIP_URL + "?")))
+                .andExpect(request -> assertThat(request.getURI().getQuery())
+                        .contains("[[\"employee\",\"=\",\"HR-EMP-00001\"],[\"docstatus\",\"in\",[0,1]]]"))
+                .andRespond(withSuccess("{\"data\":["
+                        + "{\"name\":\"S1\",\"start_date\":\"2025-01-01\",\"end_date\":\"2025-01-31\",\"posting_date\":\"2025-01-31\",\"docstatus\":1},"
+                        + "{\"name\":\"S2\",\"start_date\":\"2025-02-01\",\"end_date\":\"2025-02-28\",\"posting_date\":\"2025-02-28\",\"docstatus\":1}]}", JSON));
+        server.expect(requestTo(Matchers.startsWith("http://erp.test/api/resource/Salary%20Detail?")))
+                .andExpect(request -> assertThat(request.getURI().getQuery())
+                        .contains("[\"parent\",\"in\",[\"S1\",\"S2\"]],[\"salary_component\",\"=\",\"Indemnité\"]")
+                        .contains("parent=Salary Slip"))
+                .andRespond(withSuccess("{\"data\":["
+                        + "{\"parent\":\"S1\",\"salary_component\":\"Indemnité\",\"amount\":50000},"
+                        + "{\"parent\":\"S2\",\"salary_component\":\"Indemnité\",\"amount\":150000}]}", JSON));
+
+        List<SalaryFilterDTO> matches = service.getSalaryComponentValues("HR-EMP-00001", "Indemnité", "inf", 100000);
+
+        assertThat(matches).hasSize(1);
+        assertThat(matches.get(0).getSlipName()).isEqualTo("S1");
+        assertThat(matches.get(0).getStartDate()).isEqualTo("2025-01-01");
+        assertThat(matches.get(0).getEndDate()).isEqualTo("2025-01-31");
+        assertThat(matches.get(0).getDocstatus()).isEqualTo(1);
+        server.verify();
+    }
+
+    @Test
+    void laMoyenneDesBasesEstArrondieEtSupporteUnQuotientNonFini() {
+        server.expect(requestTo(Matchers.startsWith(SSA_URL + "?")))
+                .andExpect(request -> assertThat(request.getURI().getQuery()).contains("[[\"docstatus\",\"=\",1]]"))
+                .andRespond(withSuccess("{\"data\":[{\"base\":1000000},{\"base\":1000000},{\"base\":1000001}]}", JSON));
+
+        assertThat(service.getMoyenneTotalBaseOfAllEmployees()).contains(new BigDecimal("1000000.33"));
+    }
+
+    @Test
+    void laMoyenneSansAssignationSoumiseEstVide() {
+        server.expect(requestTo(Matchers.startsWith(SSA_URL + "?")))
+                .andRespond(withSuccess("{\"data\":[]}", JSON));
+
+        assertThat(service.getMoyenneTotalBaseOfAllEmployees()).isEmpty();
+    }
+
+    @Test
+    void laListeDesSsaInterrogeLeBonDocTypeEtIgnoreLesAnnules() {
+        server.expect(requestTo(Matchers.startsWith(SSA_URL + "?")))
+                .andExpect(request -> assertThat(request.getURI().getQuery())
+                        .contains("fields=[\"name\",\"employee\",\"employee_name\",\"salary_structure\",\"company\",\"currency\",\"base\",\"from_date\",\"to_date\",\"docstatus\"]")
+                        .contains("filters=[[\"docstatus\",\"in\",[0,1]]]"))
+                .andRespond(withSuccess("{\"data\":[{\"name\":\"HR-SSA-2025-00002\",\"employee\":\"HR-EMP-00001\","
+                        + "\"employee_name\":\"Ana Bé\",\"salary_structure\":\"Standard\",\"base\":1500,\"from_date\":\"2025-03-01\",\"docstatus\":1}]}", JSON));
+
+        List<SalaryStructAss> all = service.getAllSalaryStructureAssignments();
+
+        assertThat(all).hasSize(1);
+        assertThat(all.get(0).getName()).isEqualTo("HR-SSA-2025-00002");
+        assertThat(all.get(0).getEmployee_name()).isEqualTo("Ana Bé");
+        assertThat(all.get(0).getBase()).isEqualByComparingTo("1500");
+        assertThat(all.get(0).getFrom_date()).isEqualTo("2025-03-01");
+    }
+
+    private static SalaryStructAss assignment(String employee, String from, String to, String base) {
+        SalaryStructAss ass = new SalaryStructAss();
+        ass.setEmployee(employee);
+        ass.setSalary_structure("Standard");
+        ass.setCompany("Orinasa SA");
+        ass.setCurrency("MGA");
+        ass.setBase(new BigDecimal(base));
+        ass.setFrom_date(from);
+        ass.setTo_date(to);
+        ass.setPosting_date(to);
+        return ass;
+    }
+}

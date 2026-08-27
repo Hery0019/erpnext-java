@@ -1,206 +1,191 @@
 package hery.itu.erp.service.salary;
 
-import java.net.URI;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.YearMonth;
-import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.time.LocalDate;
-import java.math.BigDecimal;
-import java.time.format.DateTimeFormatter;
+import java.util.TreeMap;
 
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.web.util.UriComponentsBuilder;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
+import hery.itu.erp.erpnext.ErpNextClient;
+import hery.itu.erp.erpnext.ErpNextForbiddenException;
+import hery.itu.erp.erpnext.ErpNextValidationException;
+import hery.itu.erp.erpnext.Filters;
 import hery.itu.erp.model.salary.SalaryDTO;
 import hery.itu.erp.model.salary.SalaryDetail;
-import hery.itu.erp.service.login.LoginService;
+import hery.itu.erp.model.salary.SalaryGroupedDTO;
 
+/**
+ * Totaux de paie : fiches d'une période avec leurs composants, regroupées par mois.
+ * Les composants sont lus en une requête sur la table enfant {@code Salary Detail} (par lots)
+ * et non plus par un GET par fiche.
+ */
 @Service
 public class SalaryTotalService {
 
-    private final RestTemplate restTemplate;
-    private final LoginService loginService;
+    private static final Logger log = LoggerFactory.getLogger(SalaryTotalService.class);
+    private static final String SALARY_SLIP = "Salary Slip";
+    private static final String SALARY_DETAIL = "Salary Detail";
+    private static final List<Integer> DOCSTATUS_ACTIF = List.of(0, 1);
+    private static final List<String> SUMMARY_FIELDS = List.of(
+            "name", "employee", "employee_name", "company", "posting_date", "start_date", "status", "currency",
+            "gross_pay", "net_pay", "total_deduction", "total_earnings", "month_to_date", "year_to_date", "total_in_words");
+    private static final List<String> DETAIL_FIELDS = List.of("parent", "parentfield", "salary_component", "amount");
 
-    private final String baseUrl = "http://erpnext.localhost:8000";
+    private final ErpNextClient client;
 
-    public SalaryTotalService(RestTemplate restTemplate, LoginService loginService) {
-        this.restTemplate = restTemplate;
-        this.loginService = loginService;
+    public SalaryTotalService(ErpNextClient client) {
+        this.client = client;
     }
 
+    /**
+     * Fiches actives (brouillon ou soumises) dont la période commence dans l'année, ou dans le
+     * mois si fourni, avec leurs composants. Deux requêtes (plus une par lot de 100 fiches).
+     *
+     * @param month 1..12, ou null pour toute l'année
+     */
+    public List<SalaryDTO> getDetailedSlips(int year, Integer month) {
+        LocalDate from = month == null ? LocalDate.of(year, 1, 1) : YearMonth.of(year, month).atDay(1);
+        LocalDate to = month == null ? LocalDate.of(year, 12, 31) : YearMonth.of(year, month).atEndOfMonth();
+
+        List<SalaryDTO> slips = client.list(SALARY_SLIP)
+                .fields(SUMMARY_FIELDS)
+                .filters(Filters.none()
+                        .between("start_date", from.toString(), to.toString())
+                        .in("docstatus", DOCSTATUS_ACTIF))
+                .orderBy("start_date asc, employee_name asc")
+                .fetchAll().stream()
+                .map(SalaryTotalService::toSummary)
+                .toList();
+        attachComponents(slips);
+        return slips;
+    }
+
+    /** @see #getDetailedSlips(int, Integer) */
     public List<SalaryDTO> getSalarySlipsByMonth(int year, int month) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Cookie", loginService.getSessionCookie());
-
-        HttpEntity<Void> entity = new HttpEntity<>(headers);
-
-        YearMonth yearMonth = YearMonth.of(year, month);
-        String startDate = yearMonth.atDay(1).toString();
-        String endDate = yearMonth.atEndOfMonth().toString();
-
-        String filters = String.format("[[\"posting_date\",\"between\",[\"%s\",\"%s\"]]]", startDate, endDate);
-
-        URI uri = UriComponentsBuilder
-                .fromHttpUrl(baseUrl + "/api/resource/Salary Slip")
-                .queryParam("filters", filters)
-                .queryParam("limit_page_length", 1000)
-                .build()
-                .encode()
-                .toUri();
-
-        System.out.println("Appel API par mois : " + uri);
-
-        ResponseEntity<Map> response = restTemplate.exchange(
-                uri,
-                HttpMethod.GET,
-                entity,
-                Map.class);
-
-        List<SalaryDTO> salaries = new ArrayList<>();
-        if (response.getBody() != null && response.getBody().get("data") != null) {
-            List<Map<String, Object>> salarySlips = (List<Map<String, Object>>) response.getBody().get("data");
-            for (Map<String, Object> slipData : salarySlips) {
-                String slipName = (String) slipData.get("name");
-                SalaryDTO slip = getSalarySlipDetail(slipName);
-                if (slip != null) {
-                    salaries.add(slip);
-                }
-            }
-        }
-
-        return salaries;
+        return getDetailedSlips(year, month);
     }
 
+    /** Une fiche complète (avec composants) par son nom. */
     public SalaryDTO getSalarySlipDetail(String slipName) {
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Cookie", loginService.getSessionCookie());
-
-        HttpEntity<Void> entity = new HttpEntity<>(headers);
-
-        String url = baseUrl + "/api/resource/Salary Slip/" + slipName + "?limit_page_length=1000";
-        System.out.println("Appel API : " + url);
-
-        ResponseEntity<JsonNode> response = restTemplate.exchange(
-                url,
-                HttpMethod.GET,
-                entity,
-                JsonNode.class);
-
-        JsonNode data = response.getBody().path("data");
-        if (data.isMissingNode()) {
-            System.out.println("Aucune donnée trouvée pour " + slipName);
-            return null;
-        }
-
-        SalaryDTO slip = new SalaryDTO();
-        slip.setSlipName(data.path("name").asText(null));
-        slip.setEmployeeId(data.path("employee").asText(null));
-        slip.setEmployeeName(data.path("employee_name").asText(null));
-        slip.setCompany(data.path("company").asText(null));
-        if (data.has("posting_date")) {
-            LocalDate start = LocalDate.parse(data.path("posting_date").asText(), DateTimeFormatter.ISO_DATE);
-            slip.setMonth(start.getYear() + "-" + String.format("%02d", start.getMonthValue()));
-            slip.setPostingDate(start);
-        }
-        slip.setStatus(data.path("status").asText(null));
-        slip.setCurrency(data.path("currency").asText(null));
-        slip.setGrossPay(BigDecimal.valueOf(data.path("gross_pay").asDouble(0.0)));
-        slip.setNetPay(BigDecimal.valueOf(data.path("net_pay").asDouble(0.0)));
-        slip.setTotalDeduction(BigDecimal.valueOf(data.path("total_deduction").asDouble(0.0)));
-        slip.setMonthToDate(BigDecimal.valueOf(data.path("month_to_date").asDouble(0.0)));
-        slip.setYearToDate(BigDecimal.valueOf(data.path("year_to_date").asDouble(0.0)));
-        slip.setTotalInWords(data.path("total_in_words").asText(null));
-
-        if (data.has("earnings") && data.get("earnings").isArray()) {
-            for (JsonNode earningNode : data.get("earnings")) {
-                SalaryDetail earning = new SalaryDetail();
-                earning.setSalaryComponent(earningNode.path("salary_component").asText(null));
-                earning.setAmount(BigDecimal.valueOf(earningNode.path("amount").asDouble(0.0)));
-                earning.setType(SalaryDetail.Type.EARNING);
-                slip.getEarnings().add(earning);
-            }
-        }
-
-        if (data.has("deductions") && data.get("deductions").isArray()) {
-            for (JsonNode deductionNode : data.get("deductions")) {
-                SalaryDetail deduction = new SalaryDetail();
-                deduction.setSalaryComponent(deductionNode.path("salary_component").asText(null));
-                deduction.setAmount(BigDecimal.valueOf(deductionNode.path("amount").asDouble(0.0)));
-                deduction.setType(SalaryDetail.Type.DEDUCTION);
-                slip.getDeductions().add(deduction);
-            }
-        }
-
+        JsonNode data = client.getDoc(SALARY_SLIP, slipName);
+        SalaryDTO slip = toSummary(data);
+        fillComponentsFromDocument(slip, data);
         return slip;
     }
 
-    public List<SalaryDTO> getAllSalary() {
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Cookie", loginService.getSessionCookie());
-
-        HttpEntity<Void> entity = new HttpEntity<>(headers);
-
-        String url = baseUrl
-                + "/api/resource/Salary Slip?"
-                + "fields=[\"name\",\"employee\",\"employee_name\",\"posting_date\",\"start_date\",\"gross_pay\",\"net_pay\",\"total_deduction\",\"total_earnings\",\"status\"]"
-                + "&limit_page_length=1000";
-
-        ResponseEntity<Map> response = restTemplate.exchange(
-                url,
-                HttpMethod.GET,
-                entity,
-                Map.class);
-
-        List<SalaryDTO> salaries = new ArrayList<>();
-
-        if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> data = (List<Map<String, Object>>) response.getBody().get("data");
-            if (data != null) {
-                DateTimeFormatter isoFormatter = DateTimeFormatter.ISO_DATE;
-                for (Map<String, Object> item : data) {
-                    SalaryDTO slip = new SalaryDTO();
-                    slip.setSlipName((String) item.get("name"));
-                    slip.setEmployeeId((String) item.get("employee"));
-                    slip.setEmployeeName((String) item.get("employee_name"));
-
-                    if (item.get("posting_date") != null) {
-                        LocalDate dt = LocalDate.parse(item.get("posting_date").toString(), isoFormatter);
-                        slip.setPostingDate(dt);
-                    }
-
-                    if (item.get("start_date") != null) {
-                        LocalDate start = LocalDate.parse(item.get("start_date").toString(), isoFormatter);
-                        slip.setMonth(start.getYear() + "-" + String.format("%02d", start.getMonthValue()));
-                    }
-
-                    if (item.get("gross_pay") != null) {
-                        slip.setGrossPay(new BigDecimal(item.get("gross_pay").toString()));
-                    }
-                    if (item.get("net_pay") != null) {
-                        slip.setNetPay(new BigDecimal(item.get("net_pay").toString()));
-                    }
-                    if (item.get("total_deduction") != null) {
-                        slip.setTotalDeduction(new BigDecimal(item.get("total_deduction").toString()));
-                    }
-
-                    slip.setStatus((String) item.get("status"));
-
-                    salaries.add(slip);
-                }
+    /** Totaux par mois (brut, déductions, net, et par composant), triés par mois. */
+    public Map<String, SalaryGroupedDTO> groupByMonth(List<SalaryDTO> slips) {
+        Map<String, SalaryGroupedDTO> grouped = new TreeMap<>();
+        for (SalaryDTO slip : slips) {
+            if (slip.getMonth() == null) {
+                continue;
+            }
+            SalaryGroupedDTO group = grouped.computeIfAbsent(slip.getMonth(), month -> {
+                SalaryGroupedDTO g = new SalaryGroupedDTO();
+                g.setMonth(month);
+                return g;
+            });
+            group.setTotalGross(group.getTotalGross().add(orZero(slip.getGrossPay())));
+            group.setTotalDeduction(group.getTotalDeduction().add(orZero(slip.getTotalDeduction())));
+            group.setTotalNet(group.getTotalNet().add(orZero(slip.getNetPay())));
+            for (SalaryDetail e : slip.getEarnings()) {
+                group.getEarningsTotal().merge(e.getSalaryComponent(), orZero(e.getAmount()), BigDecimal::add);
+            }
+            for (SalaryDetail d : slip.getDeductions()) {
+                group.getDeductionsTotal().merge(d.getSalaryComponent(), orZero(d.getAmount()), BigDecimal::add);
             }
         }
-
-        return salaries;
+        return grouped;
     }
 
+    // ------------------------------------------------------------------ interne
+
+    private void attachComponents(List<SalaryDTO> slips) {
+        if (slips.isEmpty()) {
+            return;
+        }
+        Map<String, SalaryDTO> byName = new LinkedHashMap<>();
+        slips.forEach(slip -> byName.put(slip.getSlipName(), slip));
+
+        List<JsonNode> rows;
+        try {
+            rows = client.listChildRows(SALARY_DETAIL, SALARY_SLIP, DETAIL_FIELDS, byName.keySet(), null, "parent asc, idx asc");
+        } catch (ErpNextValidationException | ErpNextForbiddenException e) {
+            // Instance ERPNext qui refuse la lecture directe de la table enfant : repli sur un GET par fiche.
+            log.warn("Lecture groupée de Salary Detail refusée ({}) : repli sur un appel par fiche", e.getErpNextMessage());
+            for (SalaryDTO slip : slips) {
+                fillComponentsFromDocument(slip, client.getDoc(SALARY_SLIP, slip.getSlipName()));
+            }
+            return;
+        }
+        for (JsonNode row : rows) {
+            SalaryDTO slip = byName.get(row.path("parent").asText());
+            if (slip == null) {
+                continue;
+            }
+            boolean deduction = "deductions".equals(row.path("parentfield").asText());
+            (deduction ? slip.getDeductions() : slip.getEarnings())
+                    .add(toDetail(row, deduction ? SalaryDetail.Type.DEDUCTION : SalaryDetail.Type.EARNING));
+        }
+    }
+
+    private static void fillComponentsFromDocument(SalaryDTO slip, JsonNode data) {
+        for (JsonNode node : data.path("earnings")) {
+            slip.getEarnings().add(toDetail(node, SalaryDetail.Type.EARNING));
+        }
+        for (JsonNode node : data.path("deductions")) {
+            slip.getDeductions().add(toDetail(node, SalaryDetail.Type.DEDUCTION));
+        }
+    }
+
+    private static SalaryDTO toSummary(JsonNode item) {
+        SalaryDTO slip = new SalaryDTO();
+        slip.setSlipName(item.path("name").asText(null));
+        slip.setEmployeeId(item.path("employee").asText(null));
+        slip.setEmployeeName(item.path("employee_name").asText(null));
+        slip.setCompany(item.path("company").asText(null));
+        String postingDate = item.path("posting_date").asText(null);
+        if (postingDate != null) {
+            slip.setPostingDate(LocalDate.parse(postingDate));
+        }
+        // Mois de paie = période du slip (start_date), jamais la date de comptabilisation (point 3.5)
+        String startDate = item.path("start_date").asText(postingDate);
+        if (startDate != null) {
+            slip.setMonth(toMonthKey(LocalDate.parse(startDate)));
+        }
+        slip.setStatus(item.path("status").asText(null));
+        slip.setCurrency(item.path("currency").asText(null));
+        slip.setGrossPay(item.path("gross_pay").decimalValue());
+        slip.setNetPay(item.path("net_pay").decimalValue());
+        slip.setTotalDeduction(item.path("total_deduction").decimalValue());
+        slip.setTotalEarnings(item.path("total_earnings").decimalValue());
+        slip.setMonthToDate(item.path("month_to_date").decimalValue());
+        slip.setYearToDate(item.path("year_to_date").decimalValue());
+        slip.setTotalInWords(item.path("total_in_words").asText(null));
+        return slip;
+    }
+
+    private static SalaryDetail toDetail(JsonNode node, SalaryDetail.Type type) {
+        SalaryDetail detail = new SalaryDetail();
+        detail.setSalaryComponent(node.path("salary_component").asText(null));
+        detail.setAmount(node.path("amount").decimalValue());
+        detail.setType(type);
+        return detail;
+    }
+
+    private static String toMonthKey(LocalDate date) {
+        return date.getYear() + "-" + String.format("%02d", date.getMonthValue());
+    }
+
+    private static BigDecimal orZero(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
+    }
 }

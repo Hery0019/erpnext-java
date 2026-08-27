@@ -161,6 +161,9 @@
             </svg>
             <span th:text="${success}"></span>
         </div>
+        <div th:if="${warning}" style="display:flex;align-items:flex-start;gap:10px;background-color:#fff3cd;border:1px solid #ffeeba;color:#856404;padding:16px;border-radius:8px;margin-bottom:20px;font-weight:500;white-space:pre-line;">
+            <span th:text="${warning}"></span>
+        </div>
 
         <form th:action="@{/salary-struct-ass/generate}" th:object="${salaryStructAss}" method="post">
             <select name="employee" id="">

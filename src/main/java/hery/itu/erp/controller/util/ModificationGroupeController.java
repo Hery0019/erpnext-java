@@ -1,32 +1,35 @@
 package hery.itu.erp.controller.util;
 
+import java.util.List;
+
 import org.springframework.stereotype.Controller;
+import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
-import org.springframework.ui.Model;
 
-import hery.itu.erp.service.salary.SalaryComponentService;
 import hery.itu.erp.service.rh.EmployeeService;
-import hery.itu.erp.service.salary.SalaryStructAssService;
-
-import java.util.List;
+import hery.itu.erp.service.salary.BulkSalaryAdjustmentService;
+import hery.itu.erp.service.salary.BulkSalaryAdjustmentService.AdjustmentResult;
+import hery.itu.erp.service.salary.SalaryComponentService;
 
 @Controller
-public class ModificationGroupeController {   
-    private SalaryComponentService salaryComponentService;
-    private EmployeeService employeeService;
-    private SalaryStructAssService salaryStructAssService;
+public class ModificationGroupeController {
+    private final SalaryComponentService salaryComponentService;
+    private final EmployeeService employeeService;
+    private final BulkSalaryAdjustmentService bulkSalaryAdjustmentService;
 
-    public ModificationGroupeController(SalaryComponentService salaryComponentService, EmployeeService employeeService, SalaryStructAssService salaryStructAssService) {
+    public ModificationGroupeController(SalaryComponentService salaryComponentService,
+                                        EmployeeService employeeService,
+                                        BulkSalaryAdjustmentService bulkSalaryAdjustmentService) {
         this.salaryComponentService = salaryComponentService;
         this.employeeService = employeeService;
-        this.salaryStructAssService = salaryStructAssService;
+        this.bulkSalaryAdjustmentService = bulkSalaryAdjustmentService;
     }
 
     @GetMapping("/modification-groupe/show")
-    public String getModificationGroupe(Model model) throws Exception {
+    public String getModificationGroupe(Model model) {
         model.addAttribute("employees", employeeService.getImportantEmployees());
         model.addAttribute("salaryComponents", salaryComponentService.getAllSalaryComponentNames());
         return "modification_groupe";
@@ -40,34 +43,19 @@ public class ModificationGroupeController {
             @RequestParam("then") String then,
             @RequestParam("montant") double montant,
             @RequestParam("pourcentage") double pourcentage,
-            RedirectAttributes redirectAttributes) throws Exception {
+            RedirectAttributes redirectAttributes) {
 
-        // Appelle ton service pour appliquer la modification
-        salaryStructAssService.applyModification(
-                employees,
-                salaryComponent,
-                condition,
-                then,
-                montant,
-                pourcentage
-        );
+        AdjustmentResult result = bulkSalaryAdjustmentService.apply(
+                employees, salaryComponent, condition, then, montant, pourcentage);
 
-        // Construis un message de succès détaillé
-        String successMessage = String.format(
-                "Modification appliquée avec succès ! %d employé(s) mis à jour : composant '%s', condition '%s', action '%s', seuil %.2f, pourcentage %.2f%%.",
-                employees.size(),
-                salaryComponent,
-                condition,
-                then,
-                montant,
-                pourcentage
-        );
-
-        // Utilise RedirectAttributes pour que le message survive à la redirection
-        redirectAttributes.addFlashAttribute("success", successMessage);
-
+        redirectAttributes.addFlashAttribute("success", String.format(
+                "Modification appliquée : %d assignation(s) ajustée(s) pour %d employé(s) sélectionné(s) "
+                + "— composant '%s', condition '%s' %.2f, action '%s' %.2f%%.",
+                result.adjusted().size(), employees.size(), salaryComponent, condition, montant, then, pourcentage));
+        if (result.hasFailures()) {
+            redirectAttributes.addFlashAttribute("warning",
+                    "Échecs (" + result.failed().size() + ") : " + String.join(" ; ", result.failed()));
+        }
         return "redirect:/modification-groupe/show";
     }
-
-   
 }
