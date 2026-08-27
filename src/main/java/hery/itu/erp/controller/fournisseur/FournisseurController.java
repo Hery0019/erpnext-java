@@ -1,4 +1,4 @@
-package hery.itu.erp.controller.founisseur;
+package hery.itu.erp.controller.fournisseur;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -19,7 +19,7 @@ import hery.itu.erp.erpnext.ErpNextException;
 import hery.itu.erp.model.Devis;
 import hery.itu.erp.model.Fournisseur;
 import hery.itu.erp.model.ItemDevis;
-import hery.itu.erp.service.fourniseur.FournisseurService;
+import hery.itu.erp.service.fournisseur.FournisseurService;
 
 @Controller
 public class FournisseurController {

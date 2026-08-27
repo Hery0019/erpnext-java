@@ -1,4 +1,4 @@
-package hery.itu.erp.service.fourniseur;
+package hery.itu.erp.service.fournisseur;
 
 import java.util.List;
 
