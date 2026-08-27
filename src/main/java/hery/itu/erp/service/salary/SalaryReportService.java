@@ -1,131 +1,55 @@
 package hery.itu.erp.service.salary;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.*;
-import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
-
-import hery.itu.erp.service.login.LoginService;
-
 import java.time.LocalDate;
-import java.time.Month;
-import java.time.format.TextStyle;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.stereotype.Service;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
+
+import hery.itu.erp.erpnext.ErpNextClient;
 
 @Service
 public class SalaryReportService {
 
-    @Autowired
-    private RestTemplate restTemplate;
+    /** Rapport ERPNext « Salary Register » (personnalisé côté serveur : filtres component/signe/combien). */
+    private static final String REPORT_NAME = "Salary Register";
+    private static final String QUERY_REPORT_RUN = "frappe.desk.query_report.run";
 
-    @Autowired
-    private LoginService loginService;
+    private final ErpNextClient client;
 
-    // Appel brut du rapport depuis ERPNext
+    public SalaryReportService(ErpNextClient client) {
+        this.client = client;
+    }
+
+    /** Réponse brute du rapport ({@code message.result}, {@code message.columns}…). */
     public Map<String, Object> getSalaryReport(LocalDate fromDate, LocalDate toDate, String company,
-                                           String employee, String salaryComponent, String signe, double combien) {
-
-        String url = "http://erpnext.localhost:8000/api/method/frappe.desk.query_report.run";
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("Cookie", loginService.getSessionCookie());
-
+                                               String employee, String salaryComponent, String signe, double combien) {
         Map<String, Object> filters = new HashMap<>();
         filters.put("from_date", fromDate.toString());
         filters.put("to_date", toDate.toString());
         filters.put("company", company);
-
         if (!employee.isEmpty()) filters.put("employee", employee);
         if (!salaryComponent.isEmpty()) filters.put("component", salaryComponent);
         if (!signe.isEmpty()) filters.put("signe", signe);
         if (combien > 0) filters.put("combien", combien);
 
-        Map<String, Object> requestBody = Map.of(
-                "report_name", "Salary Register",
-                "filters", filters
-        );
-
-        HttpEntity<Map<String, Object>> request = new HttpEntity<>(requestBody, headers);
-        ResponseEntity<Map> response = restTemplate.postForEntity(url, request, Map.class);
-
-        return response.getBody();
+        JsonNode response = client.callMethod(QUERY_REPORT_RUN, Map.of(
+                "report_name", REPORT_NAME,
+                "filters", filters));
+        return client.convert(response, new TypeReference<Map<String, Object>>() { });
     }
 
-
-
-    // Récupère les noms formatés (snake_case) des Salary Components
+    /** Noms des Salary Component au format snake_case (clés des colonnes du rapport). */
     public List<String> getFormattedSalaryComponentNames() {
-        String url = "http://erpnext.localhost:8000/api/resource/Salary Component?fields=[\"name\"]";
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Cookie", loginService.getSessionCookie());
-
-        HttpEntity<Void> entity = new HttpEntity<>(headers);
-
-        ResponseEntity<Map> response = restTemplate.exchange(
-                url,
-                HttpMethod.GET,
-                entity,
-                Map.class
-        );
-
-        List<String> formattedNames = new ArrayList<>();
-
-        if (response.getStatusCode() == HttpStatus.OK) {
-            List<Map<String, String>> data = (List<Map<String, String>>) response.getBody().get("data");
-
-            for (Map<String, String> item : data) {
-                String originalName = item.get("name");
-                String formatted = originalName.toLowerCase().replace(" ", "_");
-                formattedNames.add(formatted);
-            }
-        }
-
-        return formattedNames;
+        return client.list("Salary Component")
+                .fields("name")
+                .orderBy("name asc")
+                .fetchAll().stream()
+                .map(node -> node.path("name").asText().toLowerCase().replace(" ", "_"))
+                .toList();
     }
-
-    // public List<Map<String, Object>> getMonthlySalarySummaryByYear(int year, String company) {
-    //     List<Map<String, Object>> result = new ArrayList<>();
-    //     List<String> componentNames = getFormattedSalaryComponentNames();
-
-    //     for (int month = 1; month <= 12; month++) {
-    //         LocalDate fromDate = LocalDate.of(year, month, 1);
-    //         LocalDate toDate = fromDate.withDayOfMonth(fromDate.lengthOfMonth());
-
-    //         Map<String, Object> reportData = getSalaryReport(fromDate, toDate, company);
-
-    //         Object messageObj = reportData.get("message");
-    //         if (!(messageObj instanceof Map<?, ?> message)) continue;
-
-    //         Object resultObj = message.get("result");
-    //         if (!(resultObj instanceof List<?> resultList)) continue;
-
-    //         // Initialiser les totaux à 0 pour chaque composant
-    //         Map<String, Object> monthlySummary = new LinkedHashMap<>();
-    //         monthlySummary.put("mois", Month.of(month).getDisplayName(TextStyle.FULL, Locale.FRENCH));
-
-    //         for (String comp : componentNames) {
-    //             monthlySummary.put(comp, 0.0);
-    //         }
-
-    //         for (Object rowObj : resultList) {
-    //             if (!(rowObj instanceof Map<?, ?> row)) continue;
-
-    //             for (String comp : componentNames) {
-    //                 Object valObj = row.get(comp);
-    //                 if (valObj instanceof Number val) {
-    //                     Double current = (Double) monthlySummary.get(comp);
-    //                     monthlySummary.put(comp, current + val.doubleValue());
-    //                 }
-    //             }
-    //         }
-
-    //         result.add(monthlySummary);
-    //     }
-
-    //     return result;
-    // }
-
-    
 }
