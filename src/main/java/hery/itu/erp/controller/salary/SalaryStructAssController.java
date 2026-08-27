@@ -1,5 +1,9 @@
 package hery.itu.erp.controller.salary;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
+
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -10,31 +14,27 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import hery.itu.erp.model.rh.Employee;
 import hery.itu.erp.model.salary.SalaryStructAss;
-import hery.itu.erp.service.salary.SalaryStructAssService;
 import hery.itu.erp.service.rh.EmployeeService;
-import hery.itu.erp.service.util.StringConvertService;
-
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.util.List;
-
-
+import hery.itu.erp.service.salary.PayrollGenerationService;
+import hery.itu.erp.service.salary.PayrollGenerationService.GenerationResult;
+import hery.itu.erp.service.salary.SalaryStructAssService;
 
 @Controller
-public class SalaryStructAssController {    
+public class SalaryStructAssController {
     private final SalaryStructAssService salaryStructAssService;
+    private final PayrollGenerationService payrollGenerationService;
     private final EmployeeService employeeService;
-    private final StringConvertService stringConvertService;
 
-    public SalaryStructAssController(SalaryStructAssService salaryStructAssService, EmployeeService employeeService, StringConvertService stringConvertService) {
+    public SalaryStructAssController(SalaryStructAssService salaryStructAssService,
+                                     PayrollGenerationService payrollGenerationService,
+                                     EmployeeService employeeService) {
         this.salaryStructAssService = salaryStructAssService;
+        this.payrollGenerationService = payrollGenerationService;
         this.employeeService = employeeService;
-        this.stringConvertService = stringConvertService;
     }
 
     @GetMapping("/salary-struct-ass/list")
-    public String listSalaryStructureAssignments(Model model) throws Exception {
-        // Appel du service pour récupérer la liste
+    public String listSalaryStructureAssignments(Model model) {
         List<SalaryStructAss> assignments = salaryStructAssService.getAllSalaryStructureAssignments();
         model.addAttribute("assignments", assignments);
         return "salary-struct-ass";
@@ -58,8 +58,7 @@ public class SalaryStructAssController {
         @RequestParam String base,
         @RequestParam String currency,
         Model model
-    ) throws Exception {
-        // Appel service
+    ) {
         SalaryStructAss salaryStructAss = new SalaryStructAss();
         salaryStructAss.setEmployee(employee);
         salaryStructAss.setSalary_structure(salary_structure);
@@ -73,7 +72,6 @@ public class SalaryStructAssController {
         salaryStructAssService.createAssignmentAndSlip(salaryStructAss);
 
         model.addAttribute("success", "Salary Struct Ass created successfully");
-
         return "redirect:/salary-struct-ass";
     }
 
@@ -89,69 +87,53 @@ public class SalaryStructAssController {
         @RequestParam String employee,
         @RequestParam String salary_structure,
         @RequestParam String company,
-        @RequestParam String from_date,  // date début
-        @RequestParam String to_date,    // date fin
+        @RequestParam String from_date,
+        @RequestParam String to_date,
         @RequestParam String posting_date,
-        @RequestParam(required = false) String base,  // peut être null ou vide
+        @RequestParam(required = false) String base,
         @RequestParam String currency,
-        @RequestParam(required = false) String ecraser,  // peut être null ou vide
-        @RequestParam(required = false) String moyenne,  // peut être null ou vide
+        @RequestParam(required = false) String ecraser,
+        @RequestParam(required = false) String moyenne,
         Model model
-    ) throws Exception {
-
-        // ✅ Nettoyer base si vide ou seulement des espaces
-        if (base != null && base.trim().isEmpty()) {
-            base = null;
+    ) {
+        SalaryStructAss template = new SalaryStructAss();
+        template.setEmployee(employee);
+        template.setSalary_structure(salary_structure);
+        template.setCompany(company);
+        template.setCurrency(currency);
+        template.setPosting_date(posting_date);
+        if (base != null && !base.trim().isEmpty()) {
+            template.setBase(new BigDecimal(base.trim()));
         }
 
-        // 🔑 Construire SalaryStructAss de base
-        SalaryStructAss salaryStructAss = new SalaryStructAss();
-        salaryStructAss.setName("Salary Structure Assignment " + employee);
-        salaryStructAss.setEmployee(employee);
-        salaryStructAss.setSalary_structure(salary_structure);
-        salaryStructAss.setCompany(company);
-        salaryStructAss.setCurrency(currency);
-
-        if (base != null) {
-            salaryStructAss.setBase(new BigDecimal(base));
-        }
-
-        salaryStructAss.setPosting_date(posting_date);
-
-        // ✅ Appeler la nouvelle méthode generateSalary avec LocalDate
-        LocalDate start = LocalDate.parse(from_date);
-        LocalDate end = LocalDate.parse(to_date);
-
-        var slips = salaryStructAssService.generateSalary(salaryStructAss, start, end, ecraser, moyenne);
+        GenerationResult result = payrollGenerationService.generate(
+                template, LocalDate.parse(from_date), LocalDate.parse(to_date),
+                "oui".equalsIgnoreCase(ecraser), "oui".equalsIgnoreCase(moyenne));
 
         model.addAttribute("success",
-            "Salary Slips générés : " + slips.size() + " slips créés de " + from_date + " à " + to_date
+            "Salary Slips générés : " + result.created().size() + " slips créés de " + from_date + " à " + to_date
         );
-
         return "redirect:/salary-struct-ass/generate-form";
     }
 
-    // ✅ Affiche le formulaire de modification pour un Salary Structure Assignment
     @GetMapping("/salary-struct-ass/edit/{id}")
-    public String editSalaryStructAss(@PathVariable("id") String id, Model model) throws Exception {
-        // Récupère les infos depuis ERPNext via le service
+    public String editSalaryStructAss(@PathVariable("id") String id, Model model) {
         SalaryStructAss ass = salaryStructAssService.getAssignmentById(id);
         model.addAttribute("assignment", ass);
-        return "salary-struct-ass-edit"; // la page Thymeleaf qu'on va créer
+        return "salary-struct-ass-edit";
     }
 
-    // ✅ Soumet le formulaire modifié
+    /** Remplace le SSA (annulation + amendement) et régénère ses fiches de paie. */
     @PostMapping("/salary-struct-ass/update")
-    public String updateSalaryStructAss(@ModelAttribute SalaryStructAss updatedAss, Model model) throws Exception {
-        salaryStructAssService.updateAssignment(updatedAss);
+    public String updateSalaryStructAss(@ModelAttribute SalaryStructAss updatedAss) {
+        salaryStructAssService.replaceAssignment(updatedAss);
         return "redirect:/salary-struct-ass/list";
     }
 
-    // ✅ Supprime un Salary Structure Assignment
+    /** Annule un SSA soumis (ou supprime un brouillon). */
     @GetMapping("/salary-struct-ass/delete/{id}")
-    public String deleteSalaryStructAss(@PathVariable("id") String id, Model model) throws Exception {
+    public String deleteSalaryStructAss(@PathVariable("id") String id) {
         salaryStructAssService.deleteAssignment(id);
         return "redirect:/salary-struct-ass/list";
     }
-    
 }
