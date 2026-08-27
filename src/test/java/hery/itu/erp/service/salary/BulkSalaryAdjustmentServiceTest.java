@@ -104,6 +104,19 @@ class BulkSalaryAdjustmentServiceTest {
     }
 
     @Test
+    void parametresHorsBornesRefusesAvantToutAppelErpNext() {
+        assertThatThrownBy(() -> service.apply(List.of(EMP), "Basic", "inf", "retirer", 100.0, 150.0))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("0 et 100");
+        assertThatThrownBy(() -> service.apply(List.of(EMP), "Basic", "inf", "retirer", -1.0, 10.0))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("seuil");
+        assertThatThrownBy(() -> service.apply(List.of(), "Basic", "inf", "retirer", 100.0, 10.0))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("employé");
+        assertThatThrownBy(() -> service.apply(List.of(EMP), "Basic", "egal", "retirer", 100.0, 10.0))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Condition");
+        org.mockito.Mockito.verifyNoInteractions(assignments);
+    }
+
+    @Test
     void facteurSelonLAction() {
         assertThat(BulkSalaryAdjustmentService.multiplier("ajouter", 10)).isEqualByComparingTo("1.1");
         assertThat(BulkSalaryAdjustmentService.multiplier("retirer", 25)).isEqualByComparingTo("0.75");

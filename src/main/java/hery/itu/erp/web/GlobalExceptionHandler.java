@@ -1,5 +1,7 @@
 package hery.itu.erp.web;
 
+import java.time.format.DateTimeParseException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.TypeMismatchException;
@@ -79,6 +81,13 @@ public class GlobalExceptionHandler {
         log.warn("Requête invalide : {}", e.getMessage());
         return errorView(model, response, HttpStatus.BAD_REQUEST, "Requête invalide",
                 orDefault(e.getMessage(), "Les données envoyées sont invalides."));
+    }
+
+    @ExceptionHandler(DateTimeParseException.class)
+    public String invalidDate(DateTimeParseException e, HttpServletResponse response, Model model) {
+        log.warn("Date invalide : {}", e.getParsedString());
+        return errorView(model, response, HttpStatus.BAD_REQUEST, "Date invalide",
+                "La date « " + e.getParsedString() + " » n'est pas au format attendu (AAAA-MM-JJ).");
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)

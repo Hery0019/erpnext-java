@@ -3,8 +3,10 @@ package hery.itu.erp.web;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
@@ -86,6 +88,18 @@ class GlobalExceptionHandlerTest {
                 .andExpect(status().isServiceUnavailable())
                 .andExpect(view().name("error"))
                 .andExpect(content().string(not(containsString("Connection refused"))));
+    }
+
+    @Test
+    void dateMalFormeeDonne400AvecUnMessageClair() throws Exception {
+        mvc.perform(post("/salary-struct-ass/generate").with(user("hery")).with(csrf())
+                        .param("employee", "HR-EMP-00001").param("salary_structure", "Standard")
+                        .param("company", "Orinasa SA").param("currency", "MGA")
+                        .param("from_date", "31/03/2025").param("to_date", "2025-03-31").param("posting_date", "2025-03-31"))
+                .andExpect(status().isBadRequest())
+                .andExpect(view().name("error"))
+                .andExpect(model().attribute("error", "Date invalide"))
+                .andExpect(content().string(containsString("31/03/2025")));
     }
 
     @Test

@@ -71,6 +71,9 @@ public class FournisseurController {
             @PathVariable String itemCode,
             @RequestParam double newPrice,
             @RequestParam String entrepot) {
+        if (newPrice < 0) {
+            return ResponseEntity.badRequest().body("Le prix unitaire doit être positif ou nul");
+        }
         try {
             fournisseurService.modifierPrixItem(devisId, itemCode, newPrice, entrepot);
             return ResponseEntity.ok("Prix mis à jour avec succès");

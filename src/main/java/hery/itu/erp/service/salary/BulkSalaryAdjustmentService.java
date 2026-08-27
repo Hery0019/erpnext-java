@@ -56,6 +56,21 @@ public class BulkSalaryAdjustmentService {
      */
     public AdjustmentResult apply(List<String> employees, String salaryComponent, String condition,
                                   String action, double threshold, double percentage) {
+        if (employees == null || employees.isEmpty()) {
+            throw new IllegalArgumentException("Sélectionnez au moins un employé.");
+        }
+        if (salaryComponent == null || salaryComponent.isBlank()) {
+            throw new IllegalArgumentException("Choisissez un composant de salaire.");
+        }
+        if (!"inf".equals(condition) && !"sup".equals(condition)) {
+            throw new IllegalArgumentException("Condition inconnue : " + condition + " (attendu : inf ou sup)");
+        }
+        if (threshold < 0) {
+            throw new IllegalArgumentException("Le seuil doit être positif ou nul.");
+        }
+        if (percentage < 0 || percentage > 100) {
+            throw new IllegalArgumentException("Le pourcentage doit être compris entre 0 et 100.");
+        }
         BigDecimal multiplier = multiplier(action, percentage);
         log.info("Modification groupée : composant={}, condition={}, action={}, seuil={}, {}%, {} employé(s)",
                 salaryComponent, condition, action, threshold, percentage, employees.size());
