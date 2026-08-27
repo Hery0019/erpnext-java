@@ -20,6 +20,7 @@ import com.lowagie.text.Image;
 import com.lowagie.text.Paragraph;
 import com.lowagie.text.pdf.PdfWriter;
 
+import hery.itu.erp.config.PayrollProperties;
 import hery.itu.erp.model.salary.SalarySlip;
 
 /**
@@ -31,16 +32,16 @@ public class SalarySlipPdfService {
 
     private static final Logger log = LoggerFactory.getLogger(SalarySlipPdfService.class);
     private static final String LOGO_PATH = "static/images/logo.png";
-    // TODO (revue 6.3) : libellé de devise à externaliser dans la configuration
-    private static final String CURRENCY_LABEL = "MGA";
 
     private static final Font TITLE = new Font(Font.HELVETICA, 16, Font.BOLD);
     private static final Font SECTION = new Font(Font.HELVETICA, 12, Font.BOLD);
     private static final Font TEXT = new Font(Font.HELVETICA, 11, Font.NORMAL);
 
+    private final String currencyLabel;
     private final byte[] logo;
 
-    public SalarySlipPdfService() {
+    public SalarySlipPdfService(PayrollProperties payrollProperties) {
+        this.currencyLabel = payrollProperties.currencyLabel();
         this.logo = loadLogo();
     }
 
@@ -100,8 +101,8 @@ public class SalarySlipPdfService {
         salarySection.setSpacingBefore(20);
         salarySection.setSpacingAfter(8);
         document.add(salarySection);
-        document.add(new Paragraph("Salaire brut : " + amountFormat.format(slip.getGross_pay()) + " " + CURRENCY_LABEL, TEXT));
-        document.add(new Paragraph("Salaire net : " + amountFormat.format(slip.getNet_pay()) + " " + CURRENCY_LABEL, TEXT));
+        document.add(new Paragraph("Salaire brut : " + amountFormat.format(slip.getGross_pay()) + " " + currencyLabel, TEXT));
+        document.add(new Paragraph("Salaire net : " + amountFormat.format(slip.getNet_pay()) + " " + currencyLabel, TEXT));
         document.add(new Paragraph("Structure salariale : " + safe(slip.getSalary_structure()), TEXT));
         document.add(new Paragraph("Statut : " + safe(slip.getStatus()), TEXT));
         document.add(new Paragraph("Entreprise : " + safe(slip.getCompany()), TEXT));

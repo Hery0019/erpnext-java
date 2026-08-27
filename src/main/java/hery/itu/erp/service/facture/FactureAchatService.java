@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
+import hery.itu.erp.config.PaymentProperties;
 import hery.itu.erp.erpnext.ErpNextClient;
 import hery.itu.erp.model.DetailsFacture;
 import hery.itu.erp.model.FactureAchat;
@@ -24,15 +25,12 @@ public class FactureAchatService {
     private static final String PURCHASE_INVOICE = "Purchase Invoice";
     private static final String PAYMENT_ENTRY = "Payment Entry";
 
-    // TODO (revue 6.3) : valeurs de test à externaliser dans la configuration
-    private static final String PAYMENT_NAMING_SERIES = "PE-.YYYY.-";
-    private static final String PAID_FROM_ACCOUNT = "Capital Social - RS";
-    private static final String PAID_FROM_CURRENCY = "EUR";
-
     private final ErpNextClient client;
+    private final PaymentProperties payment;
 
-    public FactureAchatService(ErpNextClient client) {
+    public FactureAchatService(ErpNextClient client, PaymentProperties payment) {
         this.client = client;
+        this.payment = payment;
     }
 
     public List<FactureAchat> getAllFactures() {
@@ -65,7 +63,8 @@ public class FactureAchatService {
     }
 
     /**
-     * Crée puis soumet un Payment Entry référençant la facture.
+     * Crée puis soumet un Payment Entry référençant la facture, débité du compte configuré
+     * ({@code erp.payment.paid-from-account}).
      *
      * @throws hery.itu.erp.erpnext.ErpNextException si ERPNext refuse le paiement (montant, compte, droits…)
      */
@@ -74,7 +73,7 @@ public class FactureAchatService {
 
         Map<String, Object> paymentData = new HashMap<>();
         paymentData.put("doctype", PAYMENT_ENTRY);
-        paymentData.put("naming_series", PAYMENT_NAMING_SERIES);
+        paymentData.put("naming_series", payment.namingSeries());
         paymentData.put("payment_type", "Pay");
         paymentData.put("party_type", "Supplier");
         paymentData.put("party", facture.path("supplier").asText());
@@ -84,8 +83,8 @@ public class FactureAchatService {
         paymentData.put("received_amount", amount);
         paymentData.put("source_exchange_rate", 1.0);
         paymentData.put("target_exchange_rate", 1.0);
-        paymentData.put("paid_from", PAID_FROM_ACCOUNT);
-        paymentData.put("paid_from_account_currency", PAID_FROM_CURRENCY);
+        paymentData.put("paid_from", payment.paidFromAccount());
+        paymentData.put("paid_from_account_currency", payment.paidFromCurrency());
         paymentData.put("references", List.of(Map.of(
                 "reference_doctype", PURCHASE_INVOICE,
                 "reference_name", factureNom,

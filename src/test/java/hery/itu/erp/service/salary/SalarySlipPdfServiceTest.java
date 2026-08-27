@@ -10,11 +10,12 @@ import org.junit.jupiter.api.Test;
 import com.lowagie.text.pdf.PdfReader;
 import com.lowagie.text.pdf.parser.PdfTextExtractor;
 
+import hery.itu.erp.config.PayrollProperties;
 import hery.itu.erp.model.salary.SalarySlip;
 
 class SalarySlipPdfServiceTest {
 
-    private final SalarySlipPdfService service = new SalarySlipPdfService();
+    private final SalarySlipPdfService service = new SalarySlipPdfService(new PayrollProperties("Orinasa SA", "MGA"));
 
     @Test
     void unePageParFicheAvecLesMontantsFormates() throws IOException {

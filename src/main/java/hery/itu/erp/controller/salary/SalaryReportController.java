@@ -2,6 +2,7 @@ package hery.itu.erp.controller.salary;
 
 import hery.itu.erp.service.salary.SalaryReportService;
 import hery.itu.erp.service.salary.SalaryComponentService;
+import hery.itu.erp.config.PayrollProperties;
 import hery.itu.erp.service.rh.EmployeeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -24,6 +25,8 @@ public class SalaryReportController {
     SalaryComponentService salaryComponentService;
     @Autowired
     EmployeeService employeeService;
+    @Autowired
+    PayrollProperties payrollProperties;
 
     @GetMapping("/salaries")
     public String showSalaryReportPage(Model model) throws Exception {
@@ -36,13 +39,16 @@ public class SalaryReportController {
     public String showSalaryReport(
             @RequestParam("from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
             @RequestParam("to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate,
-            @RequestParam(defaultValue = "Orinasa SA") String company,
+            @RequestParam(defaultValue = "") String company,
             @RequestParam(defaultValue = "") String salaryComponent,
             @RequestParam(defaultValue = "") String signe,
             @RequestParam(defaultValue = "") String employee,
             @RequestParam(defaultValue = "0") double combien,
             Model model) {
 
+        if (company.isBlank()) {
+            company = payrollProperties.defaultCompany();
+        }
         try {
             Map<String, Object> data = salaryReportService.getSalaryReport(fromDate, toDate, company, employee, salaryComponent, signe, combien);
 
