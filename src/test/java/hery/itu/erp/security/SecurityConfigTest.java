@@ -46,9 +46,17 @@ class SecurityConfigTest {
 
     @Test
     void suppressionAnonymeRefusee() throws Exception {
-        mvc.perform(get("/employes/delete/HR-EMP-00001"))
+        mvc.perform(post("/employes/delete/HR-EMP-00001").with(csrf()))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("http://localhost/"));
+    }
+
+    @Test
+    void lesSuppressionsNeSontPlusAccessiblesEnGet() throws Exception {
+        mvc.perform(get("/employes/delete/HR-EMP-00001").with(user("hery")))
+                .andExpect(status().isMethodNotAllowed());
+        mvc.perform(get("/salary-struct-ass/delete/HR-SSA-2025-00001").with(user("hery")))
+                .andExpect(status().isMethodNotAllowed());
     }
 
     @Test

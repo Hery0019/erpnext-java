@@ -145,7 +145,7 @@ public class SalaryStructAssController {
     }
 
     /** Annule un SSA soumis (ou supprime un brouillon). */
-    @GetMapping("/salary-struct-ass/delete/{id}")
+    @PostMapping("/salary-struct-ass/delete/{id}")
     public String deleteSalaryStructAss(@PathVariable("id") String id, RedirectAttributes redirectAttributes) {
         salaryStructAssService.deleteAssignment(id);
         redirectAttributes.addFlashAttribute("success", "Assignation " + id + " annulée (ou supprimée si brouillon).");
