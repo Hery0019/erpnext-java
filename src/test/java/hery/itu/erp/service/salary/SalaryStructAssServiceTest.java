@@ -84,6 +84,78 @@ class SalaryStructAssServiceTest {
     }
 
     @Test
+    void leSlipEstSoumisSousLeNomAttribueParErpNext() {
+        server.expect(requestTo("http://erp.test/api/resource/Salary%20Slip"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(request -> assertThat(request.getBody().toString()).doesNotContain("\"name\""))
+                .andExpect(content().json("{\"employee\":\"HR-EMP-00001\",\"start_date\":\"2025-03-01\","
+                        + "\"end_date\":\"2025-03-31\",\"posting_date\":\"2025-03-31\",\"payroll_frequency\":\"Monthly\"}", false))
+                .andRespond(withSuccess("{\"data\":{\"name\":\"Sal Slip/HR-EMP-00001/00009\"}}", JSON));
+        server.expect(requestTo("http://erp.test/api/resource/Salary%20Slip/Sal%20Slip/HR-EMP-00001/00009?run_method=submit"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("{}", JSON));
+
+        SalaryStructAss ass = assignment("HR-EMP-00001", "2025-03-01", "2025-03-31", "1500");
+
+        assertThat(service.createSalarySlipAndSubmit(ass)).isEqualTo("Sal Slip/HR-EMP-00001/00009");
+        server.verify();
+    }
+
+    @Test
+    void lExistenceDUnSsaIgnoreLesDocumentsAnnulesEtCibleLEmploye() {
+        server.expect(requestTo(Matchers.startsWith("http://erp.test/api/resource/Salary%20Structure%20Assignment?")))
+                .andExpect(request -> assertThat(request.getURI().getQuery()).contains(
+                        "filters=[[\"employee\",\"=\",\"HR-EMP-00001\"],[\"from_date\",\"=\",\"2025-03-01\"],[\"docstatus\",\"in\",[0,1]]]"))
+                .andRespond(withSuccess("{\"data\":[]}", JSON));
+
+        assertThat(service.findAssignmentName("HR-EMP-00001", "2025-03-01")).isEmpty();
+    }
+
+    @Test
+    void generationSurUnMoisSansExistantCreeSsaPuisSlipAvecLesNomsRenvoyes() {
+        // 1. existence du slip (aucun) — les annulés sont exclus
+        server.expect(requestTo(Matchers.startsWith("http://erp.test/api/resource/Salary%20Slip?")))
+                .andExpect(request -> assertThat(request.getURI().getQuery()).contains(
+                        "[\"employee\",\"=\",\"HR-EMP-00001\"],[\"start_date\",\"=\",\"2025-03-01\"],[\"end_date\",\"=\",\"2025-03-31\"],[\"docstatus\",\"in\",[0,1]]"))
+                .andRespond(withSuccess("{\"data\":[]}", JSON));
+        // 2. existence du SSA (aucun)
+        server.expect(requestTo(Matchers.startsWith("http://erp.test/api/resource/Salary%20Structure%20Assignment?")))
+                .andRespond(withSuccess("{\"data\":[]}", JSON));
+        // 3. création + soumission du SSA
+        server.expect(requestTo("http://erp.test/api/resource/Salary%20Structure%20Assignment"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("{\"data\":{\"name\":\"HR-SSA-2025-00010\"}}", JSON));
+        server.expect(requestTo("http://erp.test/api/resource/Salary%20Structure%20Assignment/HR-SSA-2025-00010?run_method=submit"))
+                .andRespond(withSuccess("{}", JSON));
+        // 4. création + soumission du slip
+        server.expect(requestTo("http://erp.test/api/resource/Salary%20Slip"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withSuccess("{\"data\":{\"name\":\"Sal Slip/HR-EMP-00001/00003\"}}", JSON));
+        server.expect(requestTo("http://erp.test/api/resource/Salary%20Slip/Sal%20Slip/HR-EMP-00001/00003?run_method=submit"))
+                .andRespond(withSuccess("{}", JSON));
+
+        SalaryStructAss ass = assignment("HR-EMP-00001", null, null, "1500");
+        java.util.List<String> slips = service.generateSalary(ass,
+                java.time.LocalDate.of(2025, 3, 10), java.time.LocalDate.of(2025, 3, 20), null, null);
+
+        assertThat(slips).containsExactly("Sal Slip/HR-EMP-00001/00003");
+        server.verify();
+    }
+
+    private static SalaryStructAss assignment(String employee, String from, String to, String base) {
+        SalaryStructAss ass = new SalaryStructAss();
+        ass.setEmployee(employee);
+        ass.setSalary_structure("Standard");
+        ass.setCompany("Orinasa SA");
+        ass.setCurrency("MGA");
+        ass.setBase(new BigDecimal(base));
+        ass.setFrom_date(from);
+        ass.setTo_date(to);
+        ass.setPosting_date(to);
+        return ass;
+    }
+
+    @Test
     void rechercheDuSsaActifFiltreParEmployeEtDate() {
         server.expect(requestTo(Matchers.startsWith("http://erp.test/api/resource/Salary%20Structure%20Assignment?")))
                 .andExpect(request -> assertThat(request.getURI().getQuery()).isEqualTo(

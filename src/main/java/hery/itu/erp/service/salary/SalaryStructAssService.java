@@ -24,9 +24,7 @@ import hery.itu.erp.model.salary.SalaryStructAss;
  * Salary Structure Assignment (SSA) et Salary Slip : création/soumission, génération sur une
  * période (aléa 1), modification groupée de la base (aléa 2).
  * <p>
- * Cette version migre les appels HTTP vers {@link ErpNextClient} sans changer la logique
- * métier ; les corrections fonctionnelles (points 1.2, 1.3, 1.4, 1.5, 1.6, 1.8, 3.1 de la
- * revue) font l'objet de commits séparés.
+ * Les corrections restantes de la revue (points 1.3, 1.4, 1.5, 3.1) font l'objet de commits séparés.
  */
 @Service
 public class SalaryStructAssService {
@@ -34,6 +32,8 @@ public class SalaryStructAssService {
     private static final Logger log = LoggerFactory.getLogger(SalaryStructAssService.class);
     static final String SALARY_STRUCTURE_ASSIGNMENT = "Salary Structure Assignment";
     static final String SALARY_SLIP = "Salary Slip";
+    /** docstatus 0 (brouillon) et 1 (soumis) ; 2 = annulé, à ignorer dans les recherches d'existence. */
+    static final List<Integer> DOCSTATUS_ACTIF = List.of(0, 1);
 
     private final ErpNextClient client;
 
@@ -63,44 +63,26 @@ public class SalaryStructAssService {
         return name;
     }
 
+    /**
+     * Crée puis soumet le Salary Slip de la période du SSA. Le nom est celui attribué par ERPNext
+     * (série {@code Sal Slip/{employee}/.#####}) : il n'est jamais calculé côté client.
+     */
     public String createSalarySlipAndSubmit(SalaryStructAss salaryStructAss) {
-        String employee = salaryStructAss.getEmployee();
-        String slipName = String.format("Sal Slip/%s/%05d", employee, getNextSlipSuffix(employee));
-
         Map<String, Object> slipData = new HashMap<>();
-        slipData.put("name", slipName);
-        slipData.put("employee", employee);
+        slipData.put("employee", salaryStructAss.getEmployee());
         slipData.put("salary_structure", salaryStructAss.getSalary_structure());
         slipData.put("company", salaryStructAss.getCompany());
         slipData.put("start_date", salaryStructAss.getFrom_date());
         slipData.put("end_date", salaryStructAss.getTo_date() != null ? salaryStructAss.getTo_date() : salaryStructAss.getFrom_date());
         slipData.put("posting_date", salaryStructAss.getPosting_date());
         slipData.put("payroll_frequency", "Monthly");
-        slipData.put("base", salaryStructAss.getBase());
 
-        client.insert(SALARY_SLIP, slipData);
+        String slipName = client.insert(SALARY_SLIP, slipData).path("name").asText();
+        if (slipName.isEmpty()) {
+            throw new IllegalStateException("ERPNext n'a pas renvoyé le nom du Salary Slip créé");
+        }
         client.runDocMethod(SALARY_SLIP, slipName, "submit");
         return slipName;
-    }
-
-    private int getNextSlipSuffix(String employee) {
-        Optional<JsonNode> last = client.list(SALARY_SLIP)
-                .fields("name")
-                .filters(Filters.where("employee", "=", employee))
-                .orderBy("creation desc")
-                .first();
-        if (last.isPresent()) {
-            String lastName = last.get().path("name").asText();
-            if (lastName.contains("/")) {
-                String[] parts = lastName.split("/");
-                try {
-                    return Integer.parseInt(parts[2]) + 1;
-                } catch (NumberFormatException | ArrayIndexOutOfBoundsException e) {
-                    return 1;
-                }
-            }
-        }
-        return 1;
     }
 
     public Map<String, Object> createAssignmentAndSlip(SalaryStructAss salaryStructAss) {
@@ -123,20 +105,32 @@ public class SalaryStructAssService {
 
     // ---------------------------------------------------------------- existence
 
+    /** Un slip brouillon ou soumis existe-t-il pour l'employé sur exactement cette période ? (les annulés ne comptent pas) */
     private boolean salarySlipExists(String employee, String startDate, String endDate) {
         return client.list(SALARY_SLIP)
                 .fields("name")
-                .filters(Filters.where("employee", "=", employee).eq("start_date", startDate).eq("end_date", endDate))
+                .filters(Filters.where("employee", "=", employee)
+                        .eq("start_date", startDate)
+                        .eq("end_date", endDate)
+                        .in("docstatus", DOCSTATUS_ACTIF))
                 .first()
                 .isPresent();
     }
 
     public boolean salaryAssignmentExists(String employeeId, String fromDate) {
+        return findAssignmentName(employeeId, fromDate).isPresent();
+    }
+
+    /** Nom du SSA (brouillon ou soumis) de <b>cet</b> employé commençant à cette date. */
+    public Optional<String> findAssignmentName(String employee, String fromDate) {
         return client.list(SALARY_STRUCTURE_ASSIGNMENT)
                 .fields("name")
-                .filters(Filters.where("employee", "=", employeeId).eq("from_date", fromDate))
+                .filters(Filters.where("employee", "=", employee)
+                        .eq("from_date", fromDate)
+                        .in("docstatus", DOCSTATUS_ACTIF))
+                .orderBy("creation desc")
                 .first()
-                .isPresent();
+                .map(node -> node.path("name").asText());
     }
 
     // --------------------------------------------------------- génération (aléa 1)
@@ -169,7 +163,8 @@ public class SalaryStructAssService {
             LocalDate slipEnd = current.with(TemporalAdjusters.lastDayOfMonth());
 
             boolean slipExists = salarySlipExists(employee, slipStart.toString(), slipEnd.toString());
-            boolean assignmentExists = salaryAssignmentExists(employee, slipStart.toString());
+            Optional<String> existingAssignment = findAssignmentName(employee, slipStart.toString());
+            boolean assignmentExists = existingAssignment.isPresent();
 
             SalaryStructAss slipAss = new SalaryStructAss();
             slipAss.setEmployee(employee);
@@ -185,7 +180,8 @@ public class SalaryStructAssService {
                 if (slipExists && !ecraserOui) {
                     log.info("Slip déjà existant pour {} {} -> ignoré", employee, slipStart);
                 } else if (assignmentExists && ecraserOui) {
-                    slipAss.setName(getAssignmentNameBySalaryStructure(salaryStructAss.getSalary_structure()));
+                    // On remplace le SSA de CET employé pour CE mois — jamais celui d'un autre employé (point 1.2).
+                    slipAss.setName(existingAssignment.get());
                     Map<String, Object> result = updateAssignment(slipAss);
                     generatedSlips.add(result.get("slip").toString());
                     log.info("Slip mis à jour pour {} {}", employee, slipStart);
@@ -409,17 +405,5 @@ public class SalaryStructAssService {
                 log.info("Employé {} : SSA {} mis à jour", employee, assignmentName);
             }
         }
-    }
-
-    /** Nom du SSA le plus récent pour une structure salariale (tous employés confondus — point 1.2). */
-    public String getAssignmentNameBySalaryStructure(String salaryStructure) {
-        return client.list(SALARY_STRUCTURE_ASSIGNMENT)
-                .fields("name")
-                .filters(Filters.where("salary_structure", "=", salaryStructure))
-                .orderBy("creation desc")
-                .first()
-                .map(node -> node.path("name").asText())
-                .orElseThrow(() -> new IllegalStateException(
-                        "Aucun Salary Structure Assignment trouvé pour le Salary Structure : " + salaryStructure));
     }
 }
