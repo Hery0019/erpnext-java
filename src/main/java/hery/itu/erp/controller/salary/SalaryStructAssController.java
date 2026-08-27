@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import hery.itu.erp.model.rh.Employee;
 import hery.itu.erp.model.salary.SalaryStructAss;
@@ -18,6 +19,7 @@ import hery.itu.erp.service.rh.EmployeeService;
 import hery.itu.erp.service.salary.PayrollGenerationService;
 import hery.itu.erp.service.salary.PayrollGenerationService.GenerationResult;
 import hery.itu.erp.service.salary.SalaryStructAssService;
+import hery.itu.erp.service.salary.SalaryStructAssService.AssignmentAndSlips;
 
 @Controller
 public class SalaryStructAssController {
@@ -57,7 +59,7 @@ public class SalaryStructAssController {
         @RequestParam String posting_date,
         @RequestParam String base,
         @RequestParam String currency,
-        Model model
+        RedirectAttributes redirectAttributes
     ) {
         SalaryStructAss salaryStructAss = new SalaryStructAss();
         salaryStructAss.setEmployee(employee);
@@ -69,10 +71,11 @@ public class SalaryStructAssController {
         salaryStructAss.setBase(new BigDecimal(base));
         salaryStructAss.setCurrency(currency);
 
-        salaryStructAssService.createAssignmentAndSlip(salaryStructAss);
+        AssignmentAndSlips created = salaryStructAssService.createAssignmentAndSlip(salaryStructAss);
 
-        model.addAttribute("success", "Salary Struct Ass created successfully");
-        return "redirect:/salary-struct-ass";
+        redirectAttributes.addFlashAttribute("success", "Assignation " + created.assignment()
+                + " créée et soumise ; fiche de paie : " + String.join(", ", created.slips()) + ".");
+        return "redirect:/salary-struct-ass/list";
     }
 
     @GetMapping("/salary-struct-ass/generate-form")
@@ -94,7 +97,7 @@ public class SalaryStructAssController {
         @RequestParam String currency,
         @RequestParam(required = false) String ecraser,
         @RequestParam(required = false) String moyenne,
-        Model model
+        RedirectAttributes redirectAttributes
     ) {
         SalaryStructAss template = new SalaryStructAss();
         template.setEmployee(employee);
@@ -110,9 +113,17 @@ public class SalaryStructAssController {
                 template, LocalDate.parse(from_date), LocalDate.parse(to_date),
                 "oui".equalsIgnoreCase(ecraser), "oui".equalsIgnoreCase(moyenne));
 
-        model.addAttribute("success",
-            "Salary Slips générés : " + result.created().size() + " slips créés de " + from_date + " à " + to_date
-        );
+        StringBuilder message = new StringBuilder()
+                .append(result.created().size()).append(" fiche(s) de paie générée(s) pour ").append(employee)
+                .append(" du ").append(from_date).append(" au ").append(to_date).append('.');
+        if (!result.skipped().isEmpty()) {
+            message.append(" Mois ignorés : ").append(String.join(" ; ", result.skipped())).append('.');
+        }
+        redirectAttributes.addFlashAttribute("success", message.toString());
+        if (result.hasFailures()) {
+            redirectAttributes.addFlashAttribute("warning",
+                    "Échecs (" + result.failed().size() + ") : " + String.join(" ; ", result.failed()));
+        }
         return "redirect:/salary-struct-ass/generate-form";
     }
 
@@ -125,15 +136,19 @@ public class SalaryStructAssController {
 
     /** Remplace le SSA (annulation + amendement) et régénère ses fiches de paie. */
     @PostMapping("/salary-struct-ass/update")
-    public String updateSalaryStructAss(@ModelAttribute SalaryStructAss updatedAss) {
-        salaryStructAssService.replaceAssignment(updatedAss);
+    public String updateSalaryStructAss(@ModelAttribute SalaryStructAss updatedAss, RedirectAttributes redirectAttributes) {
+        AssignmentAndSlips replaced = salaryStructAssService.replaceAssignment(updatedAss);
+        redirectAttributes.addFlashAttribute("success", "Assignation " + updatedAss.getName() + " remplacée par "
+                + replaced.assignment() + " ; fiche(s) régénérée(s) : "
+                + (replaced.slips().isEmpty() ? "aucune" : String.join(", ", replaced.slips())) + ".");
         return "redirect:/salary-struct-ass/list";
     }
 
     /** Annule un SSA soumis (ou supprime un brouillon). */
     @GetMapping("/salary-struct-ass/delete/{id}")
-    public String deleteSalaryStructAss(@PathVariable("id") String id) {
+    public String deleteSalaryStructAss(@PathVariable("id") String id, RedirectAttributes redirectAttributes) {
         salaryStructAssService.deleteAssignment(id);
+        redirectAttributes.addFlashAttribute("success", "Assignation " + id + " annulée (ou supprimée si brouillon).");
         return "redirect:/salary-struct-ass/list";
     }
 }

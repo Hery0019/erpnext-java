@@ -49,9 +49,12 @@ public class SalaryTotalService {
         slip.setCompany(data.path("company").asText(null));
         String postingDate = data.path("posting_date").asText(null);
         if (postingDate != null) {
-            LocalDate date = LocalDate.parse(postingDate);
-            slip.setMonth(toMonthKey(date));
-            slip.setPostingDate(date);
+            slip.setPostingDate(LocalDate.parse(postingDate));
+        }
+        // Mois de paie = période du slip (start_date), jamais la date de comptabilisation (point 3.5)
+        String startDate = data.path("start_date").asText(postingDate);
+        if (startDate != null) {
+            slip.setMonth(toMonthKey(LocalDate.parse(startDate)));
         }
         slip.setStatus(data.path("status").asText(null));
         slip.setCurrency(data.path("currency").asText(null));

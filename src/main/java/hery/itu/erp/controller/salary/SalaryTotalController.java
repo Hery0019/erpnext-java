@@ -44,12 +44,12 @@ public class SalaryTotalController {
         if (!month.isEmpty()) {
             String fullMonth = year + "-" + month;
             filteredSalaries = allSalaries.stream()
-                    .filter(s -> s.getMonth().equals(fullMonth))
+                    .filter(s -> fullMonth.equals(s.getMonth()))
                     .map(slip -> salaryTotalService.getSalarySlipDetail(slip.getSlipName()))
                     .toList();
         } else {
             filteredSalaries = allSalaries.stream()
-                    .filter(s -> s.getMonth().startsWith(year))
+                    .filter(s -> s.getMonth() != null && s.getMonth().startsWith(year))
                     .map(slip -> salaryTotalService.getSalarySlipDetail(slip.getSlipName()))
                     .toList();
         }
@@ -109,12 +109,12 @@ public class SalaryTotalController {
         if (!month.isEmpty()) {
             String fullMonth = year + "-" + month;
             return allSalaries.stream()
-                    .filter(s -> s.getMonth().equals(fullMonth))
+                    .filter(s -> fullMonth.equals(s.getMonth()))
                     .map(slip -> salaryTotalService.getSalarySlipDetail(slip.getSlipName()))
                     .toList();
         } else {
             return allSalaries.stream()
-                    .filter(s -> s.getMonth().startsWith(year))
+                    .filter(s -> s.getMonth() != null && s.getMonth().startsWith(year))
                     .map(slip -> salaryTotalService.getSalarySlipDetail(slip.getSlipName()))
                     .toList();
         }
